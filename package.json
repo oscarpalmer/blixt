@@ -1,0 +1,14 @@
+{
+	"author": {
+		"name": "Oscar Palmér",
+		"url": "https://oscarpalmer.se"
+	},
+	"description": "⚡️",
+	"license": "MIT",
+	"name": "@oscarpalmer/blixt",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/oscarpalmer/blixt.git"
+	},
+	"version": "0.1.0"
+}
