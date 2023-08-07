@@ -3,12 +3,38 @@
 		"name": "Oscar Palmér",
 		"url": "https://oscarpalmer.se"
 	},
+	"browser": "dist/blixt.iife.js",
 	"description": "⚡️",
+	"devDependencies": {
+		"esbuild": "^0.18",
+		"xo": "^0.55"
+	},
+	"files": [
+		"dist",
+		"src"
+	],
+	"jsdelivr": "dist/blixt.iife.js",
+	"keywords": [
+		"reactive",
+		"template"
+	],
 	"license": "MIT",
+	"main": "dist/blixt.iife.js",
+	"module": "dist/blixt.js",
 	"name": "@oscarpalmer/blixt",
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/oscarpalmer/blixt.git"
 	},
-	"version": "0.1.0"
+	"scripts": {
+		"build": "npm run build:esm; npm run build:iife; npm run types",
+		"build:esm": "esbuild ./src/index.js --bundle --format=esm --outfile=./dist/blixt.js --target=es2020",
+		"build:iife": "esbuild ./src/index.js --bundle --format=iife --global-name=Blixt --outfile=./dist/blixt.iife.js --target=es2020",
+		"types": "./node_modules/.bin/tsc ./src/index.js --allowJs --declaration --declarationDir ./types --emitDeclarationOnly --removeComments",
+		"xo": "./node_modules/.bin/xo ./src/*.js --env browser"
+	},
+	"type": "module",
+	"types": "src/index.d.ts",
+	"unpkg": "dist/blixt.iife.js",
+	"version": "0.2.0"
 }
