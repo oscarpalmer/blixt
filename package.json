@@ -6,12 +6,14 @@
 	"browser": "dist/blixt.iife.js",
 	"description": "⚡️",
 	"devDependencies": {
+		"@marketgridsys/prettier": "^2.9.0-mgs.5",
 		"esbuild": "^0.18",
 		"xo": "^0.55"
 	},
 	"files": [
 		"dist",
-		"src"
+		"src",
+		"types"
 	],
 	"jsdelivr": "dist/blixt.iife.js",
 	"keywords": [
@@ -31,10 +33,11 @@
 		"build:esm": "esbuild ./src/index.js --bundle --format=esm --outfile=./dist/blixt.js --target=es2020",
 		"build:iife": "esbuild ./src/index.js --bundle --format=iife --global-name=Blixt --outfile=./dist/blixt.iife.js --target=es2020",
 		"types": "./node_modules/.bin/tsc ./src/index.js --allowJs --declaration --declarationDir ./types --emitDeclarationOnly --removeComments",
+		"watch": "esbuild ./src/index.js --bundle --watch --format=esm --main-fields=module,main --outfile=dist/blixt.js --platform=neutral --target=esnext",
 		"xo": "./node_modules/.bin/xo ./src/*.js --env browser"
 	},
 	"type": "module",
 	"types": "src/index.d.ts",
 	"unpkg": "dist/blixt.iife.js",
-	"version": "0.2.0"
+	"version": "0.3.0"
 }
