@@ -7,7 +7,7 @@
 	"description": "⚡️",
 	"devDependencies": {
 		"@marketgridsys/prettier": "^2.9.0-mgs.5",
-		"esbuild": "^0.18",
+		"esbuild": "^0.19",
 		"xo": "^0.55"
 	},
 	"files": [
@@ -39,7 +39,7 @@
 	"type": "module",
 	"types": "src/index.d.ts",
 	"unpkg": "dist/blixt.iife.js",
-	"version": "0.4.0",
+	"version": "0.5.0",
 	"xo": {
 		"rules": {
 			"no-use-extend-native/no-use-extend-native": "off"
