@@ -1,24 +1,26 @@
 // src/helpers.js
-var keyTypes = /* @__PURE__ */ new Set(['number', 'string']);
+var keyTypes = /* @__PURE__ */ new Set(['number', 'string', 'symbol']);
 var period = '.';
 function getKey(prefix, property) {
-	return [prefix, property]
-		.filter(value => keyTypes.has(typeof value))
-		.join(period);
+	return [prefix, property].filter(value => isKey(value)).join(period);
 }
 function getValue(data, key) {
 	if (typeof data !== 'object') {
 		return data;
 	}
-	if (!key.includes(period)) {
-		return data[key];
+	const keyAsString = String(key);
+	if (!keyAsString.includes(period)) {
+		return data[keyAsString];
 	}
-	const parts = key.split(period);
+	const parts = keyAsString.split(period);
 	let value = data;
 	for (const part of parts) {
 		value = value?.[part];
 	}
 	return value;
+}
+function isKey(value) {
+	return keyTypes.has(typeof value);
 }
 
 // src/store.js
@@ -41,7 +43,13 @@ function createStore(data, state, prefix) {
 			}
 			const value = Reflect.get(target, property);
 			if (isArray && property in Array.prototype) {
-				return handleArray(state, prefix, property, value, proxyValue);
+				return handleArray({
+					prefix,
+					value,
+					array: proxyValue,
+					callback: property,
+					state: proxyState,
+				});
 			}
 			return value;
 		},
@@ -93,7 +101,8 @@ function emit(state, prefix, properties) {
 		}
 	}
 }
-function handleArray(state, prefix, callback, value, array) {
+function handleArray(parameters) {
+	const {array, callback, state, prefix, value} = parameters;
 	function synthetic(...args) {
 		const result = Array.prototype[callback].call(array, ...args);
 		emit(
@@ -136,13 +145,15 @@ function store(data) {
 	return createStore(data);
 }
 function subscribe(store2, key, callback) {
-	const stored = subscriptions.get(store2[stateKey]);
+	validateSubscription(store2, key, callback);
+	const stored = subscriptions.get(store2?.[stateKey]);
 	if (stored === void 0) {
 		return;
 	}
-	const callbacks = stored.get(key);
+	const keyAsString = String(key);
+	const callbacks = stored.get(keyAsString);
 	if (callbacks === void 0) {
-		stored.set(key, [callback]);
+		stored.set(keyAsString, [callback]);
 	} else if (!callbacks.includes(callback)) {
 		callbacks.push(callback);
 	}
@@ -162,11 +173,23 @@ function transformItem(state, prefix, key, value) {
 		: value;
 }
 function unsubscribe(store2, key, callback) {
-	const stored = subscriptions.get(store2[stateKey]);
-	const callbacks = stored?.get(key);
+	validateSubscription(store2, key, callback);
+	const stored = subscriptions.get(store2?.[stateKey]);
+	const callbacks = stored?.get(String(key));
 	const index = callbacks?.indexOf(callback) ?? -1;
 	if (index > -1) {
 		callbacks.splice(index, 1);
+	}
+}
+function validateSubscription(store2, key, callback) {
+	if (!isStore(store2)) {
+		throw new TypeError('Store must be a reactive store');
+	}
+	if (!isKey(key)) {
+		throw new TypeError('Key must be a number, string, or symbol');
+	}
+	if (typeof callback !== 'function') {
+		throw new TypeError('Callback must be a function');
 	}
 }
 

@@ -1,22 +1,34 @@
-const keyTypes = new Set(['number', 'string']);
+/** @typedef {number|string|symbol} Key */
+
+const keyTypes = new Set(['number', 'string', 'symbol']);
 const period = '.';
 
+/**
+ * @param {Key|undefined} prefix
+ * @param {Key} property
+ * @returns {string}
+ */
 export function getKey(prefix, property) {
-	return [prefix, property]
-		.filter(value => keyTypes.has(typeof value))
-		.join(period);
+	return [prefix, property].filter(value => isKey(value)).join(period);
 }
 
+/**
+ * @param {any} data
+ * @param {Key} key
+ * @returns {any}
+ */
 export function getValue(data, key) {
 	if (typeof data !== 'object') {
 		return data;
 	}
 
-	if (!key.includes(period)) {
-		return data[key];
+	const keyAsString = String(key);
+
+	if (!keyAsString.includes(period)) {
+		return data[keyAsString];
 	}
 
-	const parts = key.split(period);
+	const parts = keyAsString.split(period);
 
 	let value = data;
 
@@ -25,4 +37,12 @@ export function getValue(data, key) {
 	}
 
 	return value;
+}
+
+/**
+ * @param {any} value
+ * @returns {boolean}
+ */
+export function isKey(value) {
+	return keyTypes.has(typeof value);
 }

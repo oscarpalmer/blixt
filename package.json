@@ -32,14 +32,14 @@
 		"build": "npm run build:esm; npm run build:iife; npm run types",
 		"build:esm": "esbuild ./src/index.js --bundle --format=esm --outfile=./dist/blixt.js --target=es2020",
 		"build:iife": "esbuild ./src/index.js --bundle --format=iife --global-name=Blixt --outfile=./dist/blixt.iife.js --target=es2020",
-		"types": "./node_modules/.bin/tsc ./src/index.js --allowJs --declaration --declarationDir ./types --emitDeclarationOnly --removeComments",
+		"types": "./node_modules/.bin/tsc ./src/index.js --allowJs --declaration --declarationDir ./types --emitDeclarationOnly",
 		"watch": "esbuild ./src/index.js --bundle --watch --format=esm --main-fields=module,main --outfile=dist/blixt.js --platform=neutral --target=esnext",
 		"xo": "./node_modules/.bin/xo ./src/*.js --env browser"
 	},
 	"type": "module",
 	"types": "src/index.d.ts",
 	"unpkg": "dist/blixt.iife.js",
-	"version": "0.5.0",
+	"version": "0.6.0",
 	"xo": {
 		"rules": {
 			"no-use-extend-native/no-use-extend-native": "off"
