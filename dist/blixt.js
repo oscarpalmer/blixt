@@ -194,5 +194,19 @@ function validateSubscription(store2, key, callback) {
 }
 
 // src/template.js
-var name = 'template';
-export {isStore, name, store, subscribe, unsubscribe};
+function template(strings, ...expressions) {
+	let html = '';
+	for (const value of strings) {
+		const index = strings.indexOf(value);
+		const expression = expressions[index];
+		if (typeof expression === 'function') {
+			html += value + expression();
+			continue;
+		}
+		html += Array.isArray(expression)
+			? value + expression.join('')
+			: value + String(expression ?? '');
+	}
+	return html;
+}
+export {isStore, store, subscribe, template, unsubscribe};

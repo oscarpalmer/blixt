@@ -39,8 +39,9 @@
 	"type": "module",
 	"types": "src/index.d.ts",
 	"unpkg": "dist/blixt.iife.js",
-	"version": "0.6.2",
+	"version": "0.7.0",
 	"xo": {
+		"envs": ["browser"],
 		"rules": {
 			"no-use-extend-native/no-use-extend-native": "off"
 		}

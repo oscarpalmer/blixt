@@ -34,7 +34,6 @@ export function subscribe<T extends Data>(
  * @param {Key} key
  * @param {Subscriber} callback
  */
-
 export function unsubscribe<T extends Data>(
 	store: Store<T>,
 	key: Key,
@@ -55,4 +54,13 @@ export type Store<T> = {
 
 export type Subscriber = (value: any, origin?: string) => void;
 
-export const name: 'template';
+/**
+ * Renders a template
+ * @param {TemplateStringsArray} strings
+ * @param {...any} expressions
+ * @returns {string}
+ */
+export function template(
+	strings: TemplateStringsArray,
+	...expressions: any[]
+): string;

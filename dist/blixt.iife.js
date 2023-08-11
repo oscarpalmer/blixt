@@ -4,8 +4,8 @@ var Blixt = (() => {
 	var __getOwnPropNames = Object.getOwnPropertyNames;
 	var __hasOwnProp = Object.prototype.hasOwnProperty;
 	var __export = (target, all) => {
-		for (var name2 in all)
-			__defProp(target, name2, {get: all[name2], enumerable: true});
+		for (var name in all)
+			__defProp(target, name, {get: all[name], enumerable: true});
 	};
 	var __copyProps = (to, from, except, desc) => {
 		if ((from && typeof from === 'object') || typeof from === 'function') {
@@ -26,9 +26,9 @@ var Blixt = (() => {
 	var src_exports = {};
 	__export(src_exports, {
 		isStore: () => isStore,
-		name: () => name,
 		store: () => store,
 		subscribe: () => subscribe,
+		template: () => template,
 		unsubscribe: () => unsubscribe,
 	});
 
@@ -234,6 +234,20 @@ var Blixt = (() => {
 	}
 
 	// src/template.js
-	var name = 'template';
+	function template(strings, ...expressions) {
+		let html = '';
+		for (const value of strings) {
+			const index = strings.indexOf(value);
+			const expression = expressions[index];
+			if (typeof expression === 'function') {
+				html += value + expression();
+				continue;
+			}
+			html += Array.isArray(expression)
+				? value + expression.join('')
+				: value + String(expression ?? '');
+		}
+		return html;
+	}
 	return __toCommonJS(src_exports);
 })();
