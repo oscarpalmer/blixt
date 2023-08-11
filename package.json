@@ -39,7 +39,7 @@
 	"type": "module",
 	"types": "src/index.d.ts",
 	"unpkg": "dist/blixt.iife.js",
-	"version": "0.7.0",
+	"version": "0.8.0",
 	"xo": {
 		"envs": ["browser"],
 		"rules": {

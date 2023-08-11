@@ -58,9 +58,22 @@ export type Subscriber = (value: any, origin?: string) => void;
  * Renders a template
  * @param {TemplateStringsArray} strings
  * @param {...any} expressions
- * @returns {string}
+ * @returns {Template}
  */
 export function template(
 	strings: TemplateStringsArray,
 	...expressions: any[]
-): string;
+): Template;
+
+declare class Template {
+	/**
+	 * @param {TemplateStringsArray} strings
+	 * @param {...any} expressions
+	 */
+	constructor(strings: TemplateStringsArray, ...expressions: any[]);
+	/**
+	 * @param {Element|undefined} parent
+	 * @returns {Node|undefined}
+	 */
+	render(parent: Element | undefined): Node | undefined;
+}

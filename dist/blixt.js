@@ -4,16 +4,16 @@ var period = '.';
 function getKey(prefix, property) {
 	return [prefix, property].filter(value => isKey(value)).join(period);
 }
-function getValue(data, key) {
-	if (typeof data !== 'object') {
-		return data;
+function getValue(data2, key) {
+	if (typeof data2 !== 'object') {
+		return data2;
 	}
 	const keyAsString = String(key);
 	if (!keyAsString.includes(period)) {
-		return data[keyAsString];
+		return data2[keyAsString];
 	}
 	const parts = keyAsString.split(period);
-	let value = data;
+	let value = data2;
 	for (const part of parts) {
 		value = value?.[part];
 	}
@@ -28,14 +28,14 @@ var stateKey = '__state';
 var proxies = /* @__PURE__ */ new WeakMap();
 var subscriptions = /* @__PURE__ */ new WeakMap();
 var State = class {};
-function createStore(data, state, prefix) {
-	if (isStore(data)) {
-		return data;
+function createStore(data2, state, prefix) {
+	if (isStore(data2)) {
+		return data2;
 	}
-	const isArray = Array.isArray(data);
+	const isArray = Array.isArray(data2);
 	const isParent = !(state instanceof State);
 	const proxyState = isParent ? new State() : state;
-	const proxyValue = transformData(proxyState, prefix, data, isArray);
+	const proxyValue = transformData(proxyState, prefix, data2, isArray);
 	const proxy = new Proxy(proxyValue, {
 		get(target, property) {
 			if (property === stateKey) {
@@ -138,11 +138,11 @@ function handleArray(parameters) {
 function isStore(value) {
 	return value?.[stateKey] instanceof State;
 }
-function store(data) {
-	if (typeof data !== 'object') {
+function store(data2) {
+	if (typeof data2 !== 'object') {
 		throw new TypeError('Data must be an object');
 	}
-	return createStore(data);
+	return createStore(data2);
 }
 function subscribe(store2, key, callback) {
 	validateSubscription(store2, key, callback);
@@ -158,11 +158,11 @@ function subscribe(store2, key, callback) {
 		callbacks.push(callback);
 	}
 }
-function transformData(state, prefix, data, isArray) {
-	const value = isArray ? [] : Object.create(data, {});
-	for (const key in data) {
-		if (key in data) {
-			value[key] = transformItem(state, prefix, key, data[key]);
+function transformData(state, prefix, data2, isArray) {
+	const value = isArray ? [] : Object.create(data2, {});
+	for (const key in data2) {
+		if (key in data2) {
+			value[key] = transformItem(state, prefix, key, data2[key]);
 		}
 	}
 	return value;
@@ -194,7 +194,50 @@ function validateSubscription(store2, key, callback) {
 }
 
 // src/template.js
+var data = /* @__PURE__ */ new WeakMap();
+var Template = class {
+	/**
+	 * @param {TemplateStringsArray} strings
+	 * @param {...any} expressions
+	 */
+	constructor(strings, ...expressions) {
+		data.set(this, {
+			expressions,
+			strings,
+		});
+	}
+	/**
+	 * @param {Element|undefined} parent
+	 * @returns {Node|undefined}
+	 */
+	render(parent) {
+		const value = toString(this);
+		const rendered = createNodes(value);
+		if (rendered === void 0) {
+			return parent ?? void 0;
+		}
+		parent?.append(rendered);
+		return parent ?? rendered;
+	}
+};
+function createNodes(html) {
+	if (html === void 0) {
+		return void 0;
+	}
+	const element = document.createElement('template');
+	element.innerHTML = html;
+	const fragment = element.content.cloneNode(true);
+	fragment.normalize();
+	return fragment;
+}
 function template(strings, ...expressions) {
+	return new Template(strings, ...expressions);
+}
+function toString(template2) {
+	const {expressions, strings} = data.get(template2) ?? {};
+	if (expressions === void 0 || strings === void 0) {
+		return void 0;
+	}
 	let html = '';
 	for (const value of strings) {
 		const index = strings.indexOf(value);
