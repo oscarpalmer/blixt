@@ -1,5 +1,7 @@
 import {getKey, getValue, isKey} from './helpers.js';
 
+/** @typedef {{[index: number]: any; [key: string]: any; [sym: symbol]: any}} Data */
+
 /**
  * @typedef ArrayParameters
  * @property {Array} array
@@ -10,6 +12,12 @@ import {getKey, getValue, isKey} from './helpers.js';
  */
 
 /** @typedef {number|string|symbol} Key */
+
+/**
+ * @typedef {{[K in keyof T]: T[K] extends Data ? Store<T[K]> : T[K]} & Data} Store<T>
+ * @template T
+ */
+
 /** @typedef {(value: any, origin?: string) => void} Subscriber */
 
 const stateKey = '__state';
@@ -23,10 +31,11 @@ const subscriptions = new WeakMap();
 class State {}
 
 /**
- * @param {object} data
+ * @template {Data} T
+ * @param {T} data
  * @param {State|undefined} state
  * @param {Key|undefined} prefix
- * @returns {any}
+ * @returns {Store<T>}
  */
 function createStore(data, state, prefix) {
 	if (isStore(data)) {
@@ -49,7 +58,8 @@ function createStore(data, state, prefix) {
 
 			if (isArray && property in Array.prototype) {
 				return handleArray({
-					prefix, value,
+					prefix,
+					value,
 					array: proxyValue,
 					callback: property,
 					state: proxyState,
@@ -184,8 +194,9 @@ export function isStore(value) {
 
 /**
  * Creates a reactive store
- * @param {object} data
- * @returns {object}
+ * @template {Data} T
+ * @param {T} data
+ * @returns {Store<T>}
  */
 export function store(data) {
 	if (typeof data !== 'object') {
@@ -197,7 +208,8 @@ export function store(data) {
 
 /**
  * Subscribes to value changes for a key in a store
- * @param {any} store
+ * @template {Data} T
+ * @param {Store<T>} store
  * @param {Key} key
  * @param {Subscriber} callback
  * @returns {void}
@@ -254,8 +266,9 @@ function transformItem(state, prefix, key, value) {
 }
 
 /**
- * Unsibscribes from value changes for a key in a store
- * @param {any} store
+ * Unsubscribes from value changes for a key in a store
+ * @template {Data} T
+ * @param {Store<T>} store
  * @param {Key} key
  * @param {Subscriber} callback
  */
