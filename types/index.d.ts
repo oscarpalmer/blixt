@@ -52,7 +52,11 @@ export type Store<T> = {
 	[K in keyof T]: T[K] extends Data ? Store<T[K]> : T[K];
 } & Data;
 
-export type Subscriber = (value: any, origin?: string) => void;
+export type Subscriber = (
+	newValue: any,
+	oldValue?: any | undefined,
+	origin?: string | undefined,
+) => void;
 
 /**
  * Renders a template
@@ -71,6 +75,7 @@ declare class Template {
 	 * @param {...any} expressions
 	 */
 	constructor(strings: TemplateStringsArray, ...expressions: any[]);
+
 	/**
 	 * @param {Element|undefined} parent
 	 * @returns {Node|undefined}

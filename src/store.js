@@ -18,7 +18,13 @@ import {getKey, getValue, isKey} from './helpers.js';
  * @template T
  */
 
-/** @typedef {(value: any, origin?: string) => void} Subscriber */
+/**
+ * @callback Subscriber
+ * @param {any} newValue
+ * @param {any=} oldValue
+ * @param {string=} origin
+ * @returns {void}
+ */
 
 const stateKey = '__state';
 
@@ -72,17 +78,36 @@ function createStore(data, state, prefix) {
 			return property === stateKey || Reflect.has(target, property);
 		},
 		set(target, property, value) {
-			const set = Reflect.set(
-				target,
-				property,
-				transformItem(proxyState, prefix, property, value),
-			);
+			const oldValue = Reflect.get(target, property);
+			const newValue = transformItem(proxyState, prefix, property, value);
+			const setValue = Reflect.set(target, property, newValue);
 
-			if (set) {
-				emit(proxyState, prefix, [property]);
+			if (setValue) {
+				let properties, values;
+
+				if (isStore(oldValue)) {
+					const keys = Object.keys(oldValue);
+
+					properties = [];
+					values = [];
+
+					for (const key of keys) {
+						if (oldValue[key] !== newValue[key]) {
+							properties.push(key);
+							values.push(oldValue[key]);
+						}
+					}
+				}
+
+				emit(
+					proxyState,
+					prefix,
+					properties ?? [property],
+					values ?? [oldValue],
+				);
 			}
 
-			return set;
+			return setValue;
 		},
 	});
 
@@ -103,9 +128,10 @@ function createStore(data, state, prefix) {
  * @param {State} state
  * @param {Key|undefined} prefix
  * @param {Key[]} properties
+ * @param {any[]} values
  * @returns {void}
  */
-function emit(state, prefix, properties) {
+function emit(state, prefix, properties, values) {
 	const proxy = proxies.get(state);
 
 	if (proxy === undefined) {
@@ -113,6 +139,8 @@ function emit(state, prefix, properties) {
 	}
 
 	const keys = properties.map(property => getKey(prefix, property));
+
+	const origin = properties.length > 1 ? prefix : keys[0];
 
 	if (prefix !== undefined) {
 		const parts = prefix.split('.');
@@ -129,10 +157,15 @@ function emit(state, prefix, properties) {
 			continue;
 		}
 
+		const index = keys.indexOf(key);
 		const value = getValue(proxy, key);
 
 		for (const callback of callbacks) {
-			callback(value, keys.indexOf(key) > 0 ? keys[0] : undefined);
+			callback(
+				value,
+				values[index] ?? undefined,
+				key !== origin ? origin : undefined,
+			);
 		}
 	}
 }
@@ -151,6 +184,7 @@ function handleArray(parameters) {
 			state,
 			prefix,
 			array.map((_, index) => index),
+			[],
 		);
 
 		return result;

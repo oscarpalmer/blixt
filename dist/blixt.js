@@ -57,15 +57,30 @@ function createStore(data2, state, prefix) {
 			return property === stateKey || Reflect.has(target, property);
 		},
 		set(target, property, value) {
-			const set = Reflect.set(
-				target,
-				property,
-				transformItem(proxyState, prefix, property, value),
-			);
-			if (set) {
-				emit(proxyState, prefix, [property]);
+			const oldValue = Reflect.get(target, property);
+			const newValue = transformItem(proxyState, prefix, property, value);
+			const setValue = Reflect.set(target, property, newValue);
+			if (setValue) {
+				let properties, values;
+				if (isStore(oldValue)) {
+					const keys = Object.keys(oldValue);
+					properties = [];
+					values = [];
+					for (const key of keys) {
+						if (oldValue[key] !== newValue[key]) {
+							properties.push(key);
+							values.push(oldValue[key]);
+						}
+					}
+				}
+				emit(
+					proxyState,
+					prefix,
+					properties ?? [property],
+					values ?? [oldValue],
+				);
 			}
-			return set;
+			return setValue;
 		},
 	});
 	Object.defineProperty(proxy, stateKey, {
@@ -78,12 +93,13 @@ function createStore(data2, state, prefix) {
 	}
 	return proxy;
 }
-function emit(state, prefix, properties) {
+function emit(state, prefix, properties, values) {
 	const proxy = proxies.get(state);
 	if (proxy === void 0) {
 		return;
 	}
 	const keys = properties.map(property => getKey(prefix, property));
+	const origin = properties.length > 1 ? prefix : keys[0];
 	if (prefix !== void 0) {
 		const parts = prefix.split('.');
 		keys.push(
@@ -95,9 +111,14 @@ function emit(state, prefix, properties) {
 		if (callbacks === void 0) {
 			continue;
 		}
+		const index = keys.indexOf(key);
 		const value = getValue(proxy, key);
 		for (const callback of callbacks) {
-			callback(value, keys.indexOf(key) > 0 ? keys[0] : void 0);
+			callback(
+				value,
+				values[index] ?? void 0,
+				key !== origin ? origin : void 0,
+			);
 		}
 	}
 }
@@ -109,6 +130,7 @@ function handleArray(parameters) {
 			state,
 			prefix,
 			array.map((_, index) => index),
+			[],
 		);
 		return result;
 	}
