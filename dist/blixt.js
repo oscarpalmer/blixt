@@ -63,19 +63,25 @@ function createStore(data2, state, prefix) {
 			if (setValue) {
 				let properties, values;
 				if (isStore(oldValue)) {
-					const keys = Object.keys(oldValue);
 					properties = [];
 					values = [];
-					for (const key of keys) {
+					const oldKeys = Object.keys(oldValue);
+					const newKeys = Object.keys(newValue);
+					for (const key of oldKeys) {
 						if (oldValue[key] !== newValue[key]) {
 							properties.push(key);
 							values.push(oldValue[key]);
 						}
 					}
+					for (const key of newKeys) {
+						if (!(key in oldValue)) {
+							properties.push(key);
+						}
+					}
 				}
 				emit(
 					proxyState,
-					prefix,
+					properties === void 0 ? prefix : `${prefix}.${property}`,
 					properties ?? [property],
 					values ?? [oldValue],
 				);
@@ -125,13 +131,20 @@ function emit(state, prefix, properties, values) {
 function handleArray(parameters) {
 	const {array, callback, state, prefix, value} = parameters;
 	function synthetic(...args) {
+		const oldArray = array.slice(0);
 		const result = Array.prototype[callback].call(array, ...args);
-		emit(
-			state,
-			prefix,
-			array.map((_, index) => index),
-			[],
-		);
+		const properties = [];
+		const values = [];
+		for (let index = 0; index < oldArray.length; index += 1) {
+			if (oldArray[index] !== array[index]) {
+				properties.push(index);
+				values.push(oldArray[index]);
+			}
+		}
+		for (let index = oldArray.length; index < array.length; index += 1) {
+			properties.push(index);
+		}
+		emit(state, prefix, properties, values);
 		return result;
 	}
 	switch (callback) {
