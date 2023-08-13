@@ -229,6 +229,7 @@ function validateSubscription(store2, key, callback) {
 }
 
 // src/template.js
+var comment = '<!-- $ -->';
 var data = /* @__PURE__ */ new WeakMap();
 var Template = class {
 	/**
@@ -236,7 +237,14 @@ var Template = class {
 	 * @param {...any} expressions
 	 */
 	constructor(strings, ...expressions) {
-		data.set(this, {expressions, strings});
+		data.set(this, {
+			strings,
+			expressions: {
+				index: 0,
+				original: expressions,
+				values: [],
+			},
+		});
 	}
 	/**
 	 * @param {Element|undefined} parent
@@ -260,13 +268,19 @@ function createNodes(html) {
 function mapNodes(template2, node) {
 	const {expressions} = data.get(template2) ?? {};
 	const children = Array.from(node.childNodes);
-	let index = 0;
 	for (const child of children) {
 		if (child.nodeType === 8) {
-			const value = expressions[index]?.() ?? '';
-			const text = document.createTextNode(value);
-			child.replaceWith(text);
-			index += 1;
+			const expression = expressions.values[expressions.index];
+			let replacement;
+			if (expression instanceof Node) {
+				replacement = expression;
+			} else if (expression instanceof Template) {
+				replacement = expression.render();
+			} else {
+				replacement = document.createTextNode(expression());
+			}
+			child.replaceWith(replacement);
+			expressions.index += 1;
 			continue;
 		}
 		if (child.hasChildNodes()) {
@@ -281,8 +295,13 @@ function template(strings, ...expressions) {
 function toString(template2) {
 	const {expressions, strings} = data.get(template2);
 	function express(value, expression) {
-		if (typeof expression === 'function') {
-			return value + `<!--$-->`;
+		if (
+			typeof expression === 'function' ||
+			expression instanceof Node ||
+			expression instanceof Template
+		) {
+			expressions.values.push(expression);
+			return value + comment;
 		}
 		if (Array.isArray(expression)) {
 			let expressed = '';
@@ -296,7 +315,7 @@ function toString(template2) {
 	let html = '';
 	for (const value of strings) {
 		const index = strings.indexOf(value);
-		const expression = expressions[index];
+		const expression = expressions.original[index];
 		html += expression === void 0 ? value : express(value, expression);
 	}
 	return html;

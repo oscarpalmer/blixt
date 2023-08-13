@@ -1,8 +1,17 @@
 /**
+ * @typedef Expressions
+ * @property {number} index
+ * @property {any[]} original
+ * @property {Array<Function|Node|Template>} values
+ */
+
+/**
  * @typedef TemplateData
- * @property {any[]} expressions
+ * @property {Expressions} expressions
  * @property {TemplateStringsArray} strings
  */
+
+const comment = '<!-- $ -->';
 
 /** @type {WeakMap<Template, TemplateData>} */
 const data = new WeakMap();
@@ -13,7 +22,14 @@ class Template {
 	 * @param {...any} expressions
 	 */
 	constructor(strings, ...expressions) {
-		data.set(this, {expressions, strings});
+		data.set(this, {
+			strings,
+			expressions: {
+				index: 0,
+				original: expressions,
+				values: [],
+			},
+		});
 	}
 
 	/**
@@ -57,16 +73,23 @@ function mapNodes(template, node) {
 
 	const children = Array.from(node.childNodes);
 
-	let index = 0;
-
 	for (const child of children) {
 		if (child.nodeType === 8) {
-			const value = expressions[index]?.() ?? '';
-			const text = document.createTextNode(value);
+			const expression = expressions.values[expressions.index];
 
-			child.replaceWith(text);
+			let replacement;
 
-			index += 1;
+			if (expression instanceof Node) {
+				replacement = expression;
+			} else if (expression instanceof Template) {
+				replacement = expression.render();
+			} else {
+				replacement = document.createTextNode(expression());
+			}
+
+			child.replaceWith(replacement);
+
+			expressions.index += 1;
 
 			continue;
 		}
@@ -101,8 +124,14 @@ function toString(template) {
 	 * @param {any} expression
 	 */
 	function express(value, expression) {
-		if (typeof expression === 'function') {
-			return value + `<!--$-->`;
+		if (
+			typeof expression === 'function' ||
+			expression instanceof Node ||
+			expression instanceof Template
+		) {
+			expressions.values.push(expression);
+
+			return value + comment;
 		}
 
 		if (Array.isArray(expression)) {
@@ -122,7 +151,7 @@ function toString(template) {
 
 	for (const value of strings) {
 		const index = strings.indexOf(value);
-		const expression = expressions[index];
+		const expression = expressions.original[index];
 
 		html += expression === undefined ? value : express(value, expression);
 	}
