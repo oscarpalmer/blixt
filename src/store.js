@@ -31,7 +31,7 @@ const stateKey = '__state';
 /** @type {WeakMap<State, ProxyConstructor>} */
 const proxies = new WeakMap();
 
-/** @type {WeakMap<State, Map<string, Array<() => void>>} */
+/** @type {WeakMap<State, Map<string, Array<Subscriber>>} */
 const subscriptions = new WeakMap();
 
 class State {}

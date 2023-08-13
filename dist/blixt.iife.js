@@ -276,10 +276,7 @@ var Blixt = (() => {
 		 * @param {...any} expressions
 		 */
 		constructor(strings, ...expressions) {
-			data.set(this, {
-				expressions,
-				strings,
-			});
+			data.set(this, {expressions, strings});
 		}
 		/**
 		 * @param {Element|undefined} parent
@@ -288,42 +285,59 @@ var Blixt = (() => {
 		render(parent) {
 			const value = toString(this);
 			const rendered = createNodes(value);
-			if (rendered === void 0) {
-				return parent ?? void 0;
-			}
-			parent?.append(rendered);
-			return parent ?? rendered;
+			const mapped = mapNodes(this, rendered);
+			parent?.append(mapped);
+			return parent ?? mapped;
 		}
 	};
 	function createNodes(html) {
-		if (html === void 0) {
-			return void 0;
-		}
 		const element = document.createElement('template');
 		element.innerHTML = html;
 		const fragment = element.content.cloneNode(true);
 		fragment.normalize();
 		return fragment;
 	}
+	function mapNodes(template2, node) {
+		const {expressions} = data.get(template2) ?? {};
+		const children = Array.from(node.childNodes);
+		let index = 0;
+		for (const child of children) {
+			if (child.nodeType === 8) {
+				const value = expressions[index]?.() ?? '';
+				const text = document.createTextNode(value);
+				child.replaceWith(text);
+				index += 1;
+				continue;
+			}
+			if (child.hasChildNodes()) {
+				mapNodes(template2, child);
+			}
+		}
+		return node;
+	}
 	function template(strings, ...expressions) {
 		return new Template(strings, ...expressions);
 	}
 	function toString(template2) {
-		const {expressions, strings} = data.get(template2) ?? {};
-		if (expressions === void 0 || strings === void 0) {
-			return void 0;
+		const {expressions, strings} = data.get(template2);
+		function express(value, expression) {
+			if (typeof expression === 'function') {
+				return value + `<!--$-->`;
+			}
+			if (Array.isArray(expression)) {
+				let expressed = '';
+				for (const e of expression) {
+					expressed += express('', e);
+				}
+				return value + expressed;
+			}
+			return value + expression;
 		}
 		let html = '';
 		for (const value of strings) {
 			const index = strings.indexOf(value);
 			const expression = expressions[index];
-			if (typeof expression === 'function') {
-				html += value + expression();
-				continue;
-			}
-			html += Array.isArray(expression)
-				? value + expression.join('')
-				: value + String(expression ?? '');
+			html += expression === void 0 ? value : express(value, expression);
 		}
 		return html;
 	}

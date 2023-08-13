@@ -1,4 +1,10 @@
-/** @type {WeakMap<Template, {expressions: any[]; strings: TemplateStringsArray}>} */
+/**
+ * @typedef TemplateData
+ * @property {any[]} expressions
+ * @property {TemplateStringsArray} strings
+ */
+
+/** @type {WeakMap<Template, TemplateData>} */
 const data = new WeakMap();
 
 class Template {
@@ -7,10 +13,7 @@ class Template {
 	 * @param {...any} expressions
 	 */
 	constructor(strings, ...expressions) {
-		data.set(this, {
-			expressions,
-			strings,
-		});
+		data.set(this, {expressions, strings});
 	}
 
 	/**
@@ -20,26 +23,19 @@ class Template {
 	render(parent) {
 		const value = toString(this);
 		const rendered = createNodes(value);
+		const mapped = mapNodes(this, rendered);
 
-		if (rendered === undefined) {
-			return parent ?? undefined;
-		}
+		parent?.append(mapped);
 
-		parent?.append(rendered);
-
-		return parent ?? rendered;
+		return parent ?? mapped;
 	}
 }
 
 /**
- * @param {string|undefined} html
+ * @param {string} html
  * @returns {Node}
  */
 function createNodes(html) {
-	if (html === undefined) {
-		return undefined;
-	}
-
 	const element = document.createElement('template');
 
 	element.innerHTML = html;
@@ -49,6 +45,38 @@ function createNodes(html) {
 	fragment.normalize();
 
 	return fragment;
+}
+
+/**
+ * @param {Template} template
+ * @param {Node} node
+ * @returns {boolean}
+ */
+function mapNodes(template, node) {
+	const {expressions} = data.get(template) ?? {};
+
+	const children = Array.from(node.childNodes);
+
+	let index = 0;
+
+	for (const child of children) {
+		if (child.nodeType === 8) {
+			const value = expressions[index]?.() ?? '';
+			const text = document.createTextNode(value);
+
+			child.replaceWith(text);
+
+			index += 1;
+
+			continue;
+		}
+
+		if (child.hasChildNodes()) {
+			mapNodes(template, child);
+		}
+	}
+
+	return node;
 }
 
 /**
@@ -63,13 +91,31 @@ export function template(strings, ...expressions) {
 
 /**
  * @param {Template} template
- * @returns {string|undefined}
+ * @returns {string}
  */
 function toString(template) {
-	const {expressions, strings} = data.get(template) ?? {};
+	const {expressions, strings} = data.get(template);
 
-	if (expressions === undefined || strings === undefined) {
-		return undefined;
+	/**
+	 * @param {string} value
+	 * @param {any} expression
+	 */
+	function express(value, expression) {
+		if (typeof expression === 'function') {
+			return value + `<!--$-->`;
+		}
+
+		if (Array.isArray(expression)) {
+			let expressed = '';
+
+			for (const e of expression) {
+				expressed += express('', e);
+			}
+
+			return value + expressed;
+		}
+
+		return value + expression;
 	}
 
 	let html = '';
@@ -78,15 +124,7 @@ function toString(template) {
 		const index = strings.indexOf(value);
 		const expression = expressions[index];
 
-		if (typeof expression === 'function') {
-			html += value + expression();
-
-			continue;
-		}
-
-		html += Array.isArray(expression)
-			? value + expression.join('')
-			: value + String(expression ?? '');
+		html += expression === undefined ? value : express(value, expression);
 	}
 
 	return html;
