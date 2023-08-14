@@ -1,20 +1,33 @@
 /**
- * @typedef Expressions
+ * @typedef TemplateExpressions
  * @property {number} index
  * @property {any[]} original
- * @property {Array<Function|Node|Template>} values
+ * @property {Array<Expression|Node|Template>} values
  */
 
 /**
  * @typedef TemplateData
- * @property {Expressions} expressions
+ * @property {TemplateExpressions} expressions
  * @property {TemplateStringsArray} strings
  */
 
-const comment = '<!-- $ -->';
+const blixt = 'blixt';
+const comment = `<!--${blixt}-->`;
 
 /** @type {WeakMap<Template, TemplateData>} */
 const data = new WeakMap();
+
+class Expression {
+	/** @param {Function} callback */
+	constructor(callback) {
+		this.callback = callback;
+	}
+
+	/** @returns {any} */
+	run() {
+		return this.callback();
+	}
+}
 
 class Template {
 	/**
@@ -74,20 +87,20 @@ function mapNodes(template, node) {
 	const children = Array.from(node.childNodes);
 
 	for (const child of children) {
-		if (child.nodeType === 8) {
+		if (child.nodeType === 8 && child.nodeValue === blixt) {
 			const expression = expressions.values[expressions.index];
 
-			let replacement;
+			let element;
 
 			if (expression instanceof Node) {
-				replacement = expression;
+				element = expression;
 			} else if (expression instanceof Template) {
-				replacement = expression.render();
+				element = expression.render();
 			} else {
-				replacement = document.createTextNode(expression());
+				element = document.createTextNode(expression.run());
 			}
 
-			child.replaceWith(replacement);
+			child.replaceWith(element);
 
 			expressions.index += 1;
 
@@ -124,12 +137,16 @@ function toString(template) {
 	 * @param {any} expression
 	 */
 	function express(value, expression) {
+		const isFunction = typeof expression === 'function';
+
 		if (
-			typeof expression === 'function' ||
-			expression instanceof Node ||
-			expression instanceof Template
+			isFunction
+			|| expression instanceof Node
+			|| expression instanceof Template
 		) {
-			expressions.values.push(expression);
+			expressions.values.push(
+				isFunction ? new Expression(expression) : expression,
+			);
 
 			return value + comment;
 		}
@@ -137,8 +154,8 @@ function toString(template) {
 		if (Array.isArray(expression)) {
 			let expressed = '';
 
-			for (const e of expression) {
-				expressed += express('', e);
+			for (const exp of expression) {
+				expressed += express('', exp);
 			}
 
 			return value + expressed;

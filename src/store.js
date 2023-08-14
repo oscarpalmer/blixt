@@ -83,7 +83,8 @@ function createStore(data, state, prefix) {
 			const setValue = Reflect.set(target, property, newValue);
 
 			if (setValue) {
-				let properties, values;
+				let properties;
+				let values;
 
 				if (isStore(oldValue)) {
 					properties = [];
@@ -171,7 +172,7 @@ function emit(state, prefix, properties, values) {
 			callback(
 				value,
 				values[index] ?? undefined,
-				key !== origin ? origin : undefined,
+				key === origin ? undefined : origin,
 			);
 		}
 	}
@@ -192,8 +193,10 @@ function handleArray(parameters) {
 		const properties = [];
 		const values = [];
 
-		for (let index = 0; index < oldArray.length; index += 1) {
-			if (oldArray[index] !== array[index]) {
+		for (const item of oldArray) {
+			const index = oldArray.indexOf(item);
+
+			if (item !== array[index]) {
 				properties.push(index);
 				values.push(oldArray[index]);
 			}
