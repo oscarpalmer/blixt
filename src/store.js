@@ -26,10 +26,13 @@ import {getKey, getValue, isKey} from './helpers.js';
  * @returns {void}
  */
 
-const stateKey = '__state';
+/** @type {Map<symbol, Map<Store<Data>, Set<Key>>>} */
+const observers = new Map();
 
 /** @type {WeakMap<State, ProxyConstructor>} */
 const proxies = new WeakMap();
+
+const stateKey = '__state';
 
 /** @type {WeakMap<State, Map<string, Set<Subscriber>>} */
 const subscriptions = new WeakMap();
@@ -59,6 +62,8 @@ function createStore(data, state, prefix) {
 			if (property === stateKey) {
 				return proxyState;
 			}
+
+			observeKey(proxyState, getKey(prefix, property));
 
 			const value = Reflect.get(target, property);
 
@@ -246,6 +251,89 @@ export function isStore(value) {
 }
 
 /**
+ * Observes changes for properties used in a function
+ * @param {Function} callback
+ * @param {{(value: any) => void}=} after
+ * @returns {void}
+ */
+export function observe(callback, after) {
+	const hasAfter = typeof after === 'function';
+
+	const id = Symbol(callback);
+
+	const queue = () => {
+		if (frame !== null) {
+			cancelAnimationFrame(frame);
+		}
+
+		frame = requestAnimationFrame(() => {
+			frame = null;
+
+			run();
+		});
+	};
+
+	/** @type {Map<Store<Data>, Set<Key>>} */
+	let current = observers.get(id) ?? new Map();
+
+	/** @type {number|null} */
+	let frame = null;
+
+	function run() {
+		observers.set(id, new Map());
+
+		const value = callback();
+
+		const observed = observers.get(id) ?? new Map();
+
+		for (const [proxy, keys] of current.entries()) {
+			const newKeys = observed.get(proxy) ?? new Set();
+
+			for (const key of keys) {
+				if (!newKeys.has(key)) {
+					unsubscribe(proxy, key, queue);
+				}
+			}
+		}
+
+		for (const [proxy, keys] of observed.entries()) {
+			for (const key of keys) {
+				subscribe(proxy, key, queue);
+			}
+		}
+
+		current = observed;
+
+		return hasAfter ? after(value) : value;
+	}
+
+	return run();
+}
+
+/**
+ * @param {State} state
+ * @param {Key} key
+ * @returns {void}
+ */
+function observeKey(state, key) {
+	const proxy = proxies.get(state);
+
+	if (proxy === undefined) {
+		return;
+	}
+
+	for (const map of observers.values()) {
+		const keys = map.get(proxy);
+
+		if (keys === undefined) {
+			map.set(proxy, new Set([key]));
+		} else {
+			keys.add(key);
+		}
+	}
+}
+
+/**
  * Creates a reactive store
  * @template {Data} T
  * @param {T} data
@@ -280,7 +368,7 @@ export function subscribe(store, key, callback) {
 	const subscribers = stored.get(keyAsString);
 
 	if (subscribers === undefined) {
-		stored.set(keyAsString, [callback]);
+		stored.set(keyAsString, new Set([callback]));
 	} else if (!subscribers.has(callback)) {
 		subscribers.add(callback);
 	}
