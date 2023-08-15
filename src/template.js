@@ -15,6 +15,18 @@ import {observe} from './store.js';
  */
 
 const blixt = 'blixt';
+
+const booleanAttributes = new Set([
+	'checked',
+	'disabled',
+	'inert',
+	'multiple',
+	'open',
+	'readonly',
+	'required',
+	'selected',
+]);
+
 const comment = `<!--${blixt}-->`;
 
 /** @type {WeakMap<Template, TemplateData>} */
@@ -142,9 +154,23 @@ function mapNodes(template, node) {
  * @returns {void}
  */
 function setAttribute(element, attribute, expression) {
-	// TODO: handle special attributes, e.g., checked, value, etc.
+	const isBoolean = booleanAttributes.has(attribute);
+
+	if (isBoolean) {
+		element.removeAttribute(attribute);
+	}
 
 	observe(expression, value => {
+		if (isBoolean) {
+			element[attribute] = typeof value === 'boolean' ? value : element[attribute];
+
+			return;
+		}
+
+		if (attribute === 'value') {
+			element.value = value;
+		}
+
 		if (value === undefined || value === null) {
 			element.removeAttribute(attribute);
 		} else {
