@@ -1,3 +1,5 @@
+import {observe} from './store.js';
+
 /**
  * @typedef TemplateExpressions
  * @property {number} index
@@ -88,21 +90,7 @@ function mapNodes(template, node) {
 
 	for (const child of children) {
 		if (child.nodeType === 8 && child.nodeValue === blixt) {
-			const expression = expressions.values[expressions.index];
-
-			let element;
-
-			if (expression instanceof Node) {
-				element = expression;
-			} else if (expression instanceof Template) {
-				element = expression.render();
-			} else {
-				element = document.createTextNode(expression.run());
-			}
-
-			child.replaceWith(element);
-
-			expressions.index += 1;
+			setNode(child, expressions.values[expressions.index++]);
 
 			continue;
 		}
@@ -113,6 +101,84 @@ function mapNodes(template, node) {
 	}
 
 	return node;
+}
+
+/**
+ * @param {Comment} comment
+ * @param {Expression} expression
+ * @returns {void}
+ */
+function setExpression(comment, expression) {
+	/**
+	 * @param {Node[]} from
+	 * @param {Node[]} to
+	 * @param {boolean} set
+	 */
+	function replace(from, to, set) {
+		for (const item of from ?? []) {
+			if (from.indexOf(item) === 0) {
+				item.replaceWith(...to);
+			} else {
+				item.remove();
+			}
+		}
+
+		current = set ? to : null;
+	}
+
+	let current = null;
+
+	observe(expression, value => {
+		if (value === undefined || value === null) {
+			replace(current, [comment], false);
+
+			return;
+		}
+
+		// TODO: support arrays
+		// TODO: smarter replace for chunks
+
+		if (Array.isArray(value)) {
+			return;
+		}
+
+		let node = value instanceof Template ? value.render() : value;
+
+		if (
+			current?.length === 1 &&
+			current[0] instanceof Text &&
+			!(node instanceof Node)
+		) {
+			current[0].textContent = value;
+
+			return;
+		}
+
+		if (!(node instanceof Node)) {
+			node = document.createTextNode(node);
+		}
+
+		replace(
+			current ?? [comment],
+			node instanceof DocumentFragment ? [...node.childNodes] : [node],
+			true,
+		);
+	});
+}
+
+/**
+ * @param {Comment} comment
+ * @param {Expression|Node|Template} expression
+ * @returns {void}
+ */
+function setNode(comment, expression) {
+	if (expression instanceof Expression) {
+		setExpression(comment, expression);
+	} else {
+		comment.replaceWith(
+			expression instanceof Node ? expression : expression.render(),
+		);
+	}
 }
 
 /**
@@ -140,9 +206,9 @@ function toString(template) {
 		const isFunction = typeof expression === 'function';
 
 		if (
-			isFunction
-			|| expression instanceof Node
-			|| expression instanceof Template
+			isFunction ||
+			expression instanceof Node ||
+			expression instanceof Template
 		) {
 			expressions.values.push(
 				isFunction ? new Expression(expression) : expression,

@@ -257,6 +257,7 @@ export function isStore(value) {
  * @returns {void}
  */
 export function observe(callback, after) {
+	const expressive = typeof callback.run === 'function';
 	const hasAfter = typeof after === 'function';
 
 	const id = Symbol(callback);
@@ -282,7 +283,7 @@ export function observe(callback, after) {
 	function run() {
 		observers.set(id, new Map());
 
-		const value = callback();
+		const value = expressive ? callback.run() : callback();
 
 		const observed = observers.get(id) ?? new Map();
 
