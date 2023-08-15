@@ -1,3 +1,9 @@
+/**
+ * @typedef EventData
+ * @property {string} name
+ * @property {AddEventListenerOptions} options
+ */
+
 /** @typedef {number|string} Key */
 
 const keyTypes = new Set(['number', 'string']);
@@ -10,6 +16,33 @@ const period = '.';
  */
 export function getKey(prefix, property) {
 	return [prefix, property].filter(value => isKey(value)).join(period);
+}
+
+/**
+ * @param {string} attribute
+ * @returns {EventData}
+ */
+export function getEventData(attribute) {
+	let name = attribute.slice(1);
+
+	/** @type {AddEventListenerOptions} */
+	const options = {
+		passive: true,
+	};
+
+	if (name.includes(':')) {
+		const [event, ...items] = name.split(':');
+
+		name = event;
+
+		options.capture = items.includes('capture');
+		options.once = items.includes('once');
+		options.passive = !items.includes('active');
+	}
+
+	return {
+		name, options,
+	};
 }
 
 /**

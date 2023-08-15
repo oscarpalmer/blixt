@@ -1,3 +1,4 @@
+import {getEventData} from './helpers.js';
 import {observe} from './store.js';
 
 /**
@@ -84,38 +85,24 @@ function createNodes(html) {
  * @returns {void}
  */
 function mapAttributes(element, expressions) {
-	const attributes = Array.from(element.attributes).filter(attribute =>
-		attribute.name.startsWith('@'),
-	);
+	const attributes = Array.from(element.attributes);
 
 	for (const attribute of attributes) {
+		if (attribute.value !== comment) {
+			continue;
+		}
+
 		const expression = expressions.values[expressions.index++];
 
 		if (!(expression instanceof Expression)) {
 			continue;
 		}
 
-		let name = attribute.name.slice(1).toLowerCase();
-
-		let active = false;
-		let capture = false;
-		let once = false;
-
-		if (name.includes(':')) {
-			const [event, ...options] = name.split(':');
-
-			name = event;
-
-			active = options.includes('active');
-			capture = options.includes('capture');
-			once = options.includes('once');
+		if (attribute.name.startsWith('@')) {
+			setEvent(element, attribute.name, expression);
+		} else {
+			setAttribute(element, attribute.name, expression);
 		}
-
-		element.addEventListener(name, expression.callback, {
-			capture, once, passive: !active,
-		});
-
-		element.removeAttribute(attribute.name);
 	}
 }
 
@@ -146,6 +133,38 @@ function mapNodes(template, node) {
 	}
 
 	return node;
+}
+
+/**
+ * @param {Element} element
+ * @param {string} attribute
+ * @param {Expression|Node|Template} expression
+ * @returns {void}
+ */
+function setAttribute(element, attribute, expression) {
+	// TODO: handle special attributes, e.g., checked, value, etc.
+
+	observe(expression, value => {
+		if (value === undefined || value === null) {
+			element.removeAttribute(attribute);
+		} else {
+			element.setAttribute(attribute, value);
+		}
+	});
+}
+
+/**
+ * @param {Element} element
+ * @param {string} attribute
+ * @param {Expression} expression
+ * @returns {void}
+ */
+function setEvent(element, attribute, expression) {
+	const event = getEventData(attribute);
+
+	element.addEventListener(event.name, expression.callback, event.options);
+
+	element.removeAttribute(attribute);
 }
 
 /**
@@ -194,7 +213,9 @@ function setExpression(comment, expression) {
 			current[0] instanceof Text &&
 			!(node instanceof Node)
 		) {
-			current[0].textContent = value;
+			if (current[0].textContent !== value) {
+				current[0].textContent = value;
+			}
 
 			return;
 		}
