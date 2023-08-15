@@ -1,7 +1,5 @@
 import {getKey, getValue, isKey} from './helpers.js';
 
-/** @typedef {{[index: number]: any; [key: string]: any; [sym: symbol]: any}} Data */
-
 /**
  * @typedef ArrayParameters
  * @property {Array} array
@@ -11,7 +9,9 @@ import {getKey, getValue, isKey} from './helpers.js';
  * @property {any} value
  */
 
-/** @typedef {number|string|symbol} Key */
+/** @typedef {{[index: number]: any; [key: string]: any}} Data */
+
+/** @typedef {number|string} Key */
 
 /**
  * @typedef {{[K in keyof T]: T[K] extends Data ? Store<T[K]> : T[K]} & Data} Store<T>
@@ -31,7 +31,7 @@ const stateKey = '__state';
 /** @type {WeakMap<State, ProxyConstructor>} */
 const proxies = new WeakMap();
 
-/** @type {WeakMap<State, Map<string, Array<Subscriber>>} */
+/** @type {WeakMap<State, Map<string, Set<Subscriber>>} */
 const subscriptions = new WeakMap();
 
 class State {}
@@ -109,7 +109,7 @@ function createStore(data, state, prefix) {
 
 				emit(
 					proxyState,
-					properties === undefined ? prefix : `${prefix}.${property}`,
+					properties === undefined ? prefix : getKey(prefix, property),
 					properties ?? [property],
 					values ?? [oldValue],
 				);
@@ -165,15 +165,13 @@ function emit(state, prefix, properties, values) {
 			continue;
 		}
 
-		const index = keys.indexOf(key);
-		const value = getValue(proxy, key);
+		const emitOrigin = key === origin ? undefined : origin;
+
+		const newValue = getValue(proxy, key);
+		const oldValue = values[keys.indexOf(key)] ?? undefined;
 
 		for (const callback of callbacks) {
-			callback(
-				value,
-				values[index] ?? undefined,
-				key === origin ? undefined : origin,
-			);
+			callback(newValue, oldValue, emitOrigin);
 		}
 	}
 }
@@ -279,12 +277,12 @@ export function subscribe(store, key, callback) {
 	}
 
 	const keyAsString = String(key);
-	const callbacks = stored.get(keyAsString);
+	const subscribers = stored.get(keyAsString);
 
-	if (callbacks === undefined) {
+	if (subscribers === undefined) {
 		stored.set(keyAsString, [callback]);
-	} else if (!callbacks.includes(callback)) {
-		callbacks.push(callback);
+	} else if (!subscribers.has(callback)) {
+		subscribers.add(callback);
 	}
 }
 
@@ -293,7 +291,7 @@ export function subscribe(store, key, callback) {
  * @param {Key|undefined} prefix
  * @param {object} data
  * @param {boolean} isArray
- * @returns {void}
+ * @returns {object}
  */
 function transformData(state, prefix, data, isArray) {
 	const value = isArray ? [] : Object.create(data, {});
@@ -312,7 +310,7 @@ function transformData(state, prefix, data, isArray) {
  * @param {Key|undefined} prefix
  * @param {Key} key
  * @param {any} value
- * @returns {void}
+ * @returns {any}
  */
 function transformItem(state, prefix, key, value) {
 	return typeof value === 'object'
@@ -326,17 +324,15 @@ function transformItem(state, prefix, key, value) {
  * @param {Store<T>} store
  * @param {Key} key
  * @param {Subscriber} callback
+ * @returns {void}
  */
 export function unsubscribe(store, key, callback) {
 	validateSubscription(store, key, callback);
 
 	const stored = subscriptions.get(store?.[stateKey]);
-	const callbacks = stored?.get(String(key));
-	const index = callbacks?.indexOf(callback) ?? -1;
+	const subscribers = stored?.get(String(key));
 
-	if (index > -1) {
-		callbacks.splice(index, 1);
-	}
+	subscribers?.delete(callback);
 }
 
 function validateSubscription(store, key, callback) {
@@ -345,7 +341,7 @@ function validateSubscription(store, key, callback) {
 	}
 
 	if (!isKey(key)) {
-		throw new TypeError('Key must be a number, string, or symbol');
+		throw new TypeError('Key must be a number or string');
 	}
 
 	if (typeof callback !== 'function') {

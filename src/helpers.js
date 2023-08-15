@@ -1,6 +1,6 @@
-/** @typedef {number|string|symbol} Key */
+/** @typedef {number|string} Key */
 
-const keyTypes = new Set(['number', 'string', 'symbol']);
+const keyTypes = new Set(['number', 'string']);
 const period = '.';
 
 /**
