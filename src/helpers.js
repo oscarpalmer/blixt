@@ -41,7 +41,8 @@ export function getEventData(attribute) {
 	}
 
 	return {
-		name, options,
+		name,
+		options,
 	};
 }
 

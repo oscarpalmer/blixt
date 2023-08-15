@@ -6,6 +6,14 @@
 export function isStore(value: any): boolean;
 
 /**
+ * Observes changes for properties used in a function
+ * @param {{(...args: any[]) => any}} callback
+ * @param {{(value: any) => void}=} after
+ * @returns {void}
+ */
+export function observe(callback: (...args: any[]) => any, after?: (value: any) => void): void;
+
+/**
  * Creates a reactive store
  * @template {Data} T
  * @param {T} data
@@ -33,6 +41,7 @@ export function subscribe<T extends Data>(
  * @param {Store<T>} store
  * @param {Key} key
  * @param {Subscriber} callback
+ * @returns {void}
  */
 export function unsubscribe<T extends Data>(
 	store: Store<T>,
@@ -43,10 +52,9 @@ export function unsubscribe<T extends Data>(
 export type Data = {
 	[index: number]: any;
 	[key: string]: any;
-	[sym: symbol]: any;
 };
 
-export type Key = number | string | symbol;
+export type Key = number | string;
 
 export type Store<T> = {
 	[K in keyof T]: T[K] extends Data ? Store<T[K]> : T[K];

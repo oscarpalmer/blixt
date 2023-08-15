@@ -209,9 +209,9 @@ function setExpression(comment, expression) {
 		let node = value instanceof Template ? value.render() : value;
 
 		if (
-			current?.length === 1 &&
-			current[0] instanceof Text &&
-			!(node instanceof Node)
+			current?.length === 1
+			&& current[0] instanceof Text
+			&& !(node instanceof Node)
 		) {
 			if (current[0].textContent !== value) {
 				current[0].textContent = value;
@@ -272,9 +272,9 @@ function toString(template) {
 		const isFunction = typeof expression === 'function';
 
 		if (
-			isFunction ||
-			expression instanceof Node ||
-			expression instanceof Template
+			isFunction
+			|| expression instanceof Node
+			|| expression instanceof Template
 		) {
 			expressions.values.push(
 				isFunction ? new Expression(expression) : expression,
