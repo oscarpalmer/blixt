@@ -401,6 +401,10 @@ function transformData(state, prefix, data, isArray) {
  * @returns {any}
  */
 function transformItem(state, prefix, key, value) {
+	if (value === undefined || value === null) {
+		return value;
+	}
+
 	return typeof value === 'object'
 		? createStore(value, state, getKey(prefix, key))
 		: value;
