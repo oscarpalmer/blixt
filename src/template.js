@@ -298,8 +298,9 @@ function toString(template) {
 
 	let html = '';
 
-	for (const value of strings) {
-		const index = strings.indexOf(value);
+	// eslint-disable-next-line unicorn/no-for-loop
+	for (let index = 0; index < strings.length; index += 1) {
+		const value = strings[index];
 		const expression = expressions.original[index];
 
 		html += expression === undefined ? value : express(value, expression);
