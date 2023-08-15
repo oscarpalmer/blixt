@@ -79,6 +79,47 @@ function createNodes(html) {
 }
 
 /**
+ * @param {Element} element
+ * @param {TemplateExpressions} expressions
+ * @returns {void}
+ */
+function mapAttributes(element, expressions) {
+	const attributes = Array.from(element.attributes).filter(attribute =>
+		attribute.name.startsWith('@'),
+	);
+
+	for (const attribute of attributes) {
+		const expression = expressions.values[expressions.index++];
+
+		if (!(expression instanceof Expression)) {
+			continue;
+		}
+
+		let name = attribute.name.slice(1).toLowerCase();
+
+		let active = false;
+		let capture = false;
+		let once = false;
+
+		if (name.includes(':')) {
+			const [event, ...options] = name.split(':');
+
+			name = event;
+
+			active = options.includes('active');
+			capture = options.includes('capture');
+			once = options.includes('once');
+		}
+
+		element.addEventListener(name, expression.callback, {
+			capture, once, passive: !active,
+		});
+
+		element.removeAttribute(attribute.name);
+	}
+}
+
+/**
  * @param {Template} template
  * @param {Node} node
  * @returns {boolean}
@@ -93,6 +134,10 @@ function mapNodes(template, node) {
 			setNode(child, expressions.values[expressions.index++]);
 
 			continue;
+		}
+
+		if (child instanceof Element) {
+			mapAttributes(child, expressions);
 		}
 
 		if (child.hasChildNodes()) {
