@@ -54,65 +54,72 @@ function createStore(data2, state, prefix) {
 	const isParent = !(state instanceof State);
 	const proxyState = isParent ? new State() : state;
 	const proxyValue = transformData(proxyState, prefix, data2, isArray);
-	const proxy = new Proxy(proxyValue, {
-		get(target, property) {
-			if (property === stateKey) {
-				return proxyState;
-			}
-			observeKey(proxyState, getKey(prefix, property));
-			const value = Reflect.get(target, property);
-			if (isArray && property in Array.prototype) {
-				return handleArray({
-					prefix,
-					value,
-					array: proxyValue,
-					callback: property,
-					state: proxyState,
-				});
-			}
-			return value;
-		},
-		has(target, property) {
-			return property === stateKey || Reflect.has(target, property);
-		},
-		set(target, property, value) {
-			const oldValue = Reflect.get(target, property);
-			const newValue = transformItem(proxyState, prefix, property, value);
-			const setValue = Reflect.set(target, property, newValue);
-			if (setValue) {
-				let properties;
-				let values;
-				if (isStore(oldValue)) {
-					properties = [];
-					values = [];
-					const oldKeys = Object.keys(oldValue);
-					const newKeys = Object.keys(newValue);
-					for (const key of oldKeys) {
-						if (oldValue[key] !== newValue[key]) {
-							properties.push(key);
-							values.push(oldValue[key]);
-						}
-					}
-					for (const key of newKeys) {
-						if (!(key in oldValue)) {
-							properties.push(key);
-						}
-					}
+	const proxy = new Proxy(
+		proxyValue,
+		{
+			get(target, property) {
+				if (property === stateKey) {
+					return proxyState;
 				}
-				emit(
-					proxyState,
-					properties === void 0 ? prefix : getKey(prefix, property),
-					properties ?? [property],
-					values ?? [oldValue],
-				);
-			}
-			return setValue;
+				observeKey(proxyState, getKey(prefix, property));
+				const value = Reflect.get(target, property);
+				if (isArray && property in Array.prototype) {
+					return handleArray({
+						prefix,
+						value,
+						array: proxyValue,
+						callback: property,
+						state: proxyState,
+					});
+				}
+				return value;
+			},
+			has(target, property) {
+				return property === stateKey || Reflect.has(target, property);
+			},
+			set(target, property, value) {
+				const oldValue = Reflect.get(target, property);
+				const newValue = transformItem(proxyState, prefix, property, value);
+				const setValue = Reflect.set(target, property, newValue);
+				if (setValue) {
+					let properties;
+					let values;
+					if (isStore(oldValue)) {
+						properties = [];
+						values = [];
+						const oldKeys = Object.keys(oldValue);
+						const newKeys = Object.keys(newValue);
+						for (const key of oldKeys) {
+							if (oldValue[key] !== newValue[key]) {
+								properties.push(key);
+								values.push(oldValue[key]);
+							}
+						}
+						for (const key of newKeys) {
+							if (!(key in oldValue)) {
+								properties.push(key);
+							}
+						}
+					}
+					emit(
+						proxyState,
+						properties === void 0 ? prefix : getKey(prefix, property),
+						properties ?? [property],
+						values ?? [oldValue],
+					);
+				}
+				return setValue;
+			},
 		},
-	});
-	Object.defineProperty(proxy, stateKey, {
-		value: proxyState,
-		writable: false,
-	});
+	);
+	Object.defineProperty(
+		proxy,
+		stateKey,
+		{
+			value: proxyState,
+			writable: false,
+		},
+	);
 	if (isParent) {
 		proxies.set(proxyState, proxy);
 		subscriptions.set(proxyState, /* @__PURE__ */ new Map());
@@ -237,7 +244,8 @@ function observeKey(state, key) {
 		const keys = map.get(proxy);
 		if (keys === void 0) {
 			map.set(proxy, /* @__PURE__ */ new Set([key]));
-		} else {
+		}
+		else {
 			keys.add(key);
 		}
 	}
@@ -258,7 +266,8 @@ function subscribe(store2, key, callback) {
 	const subscribers = stored.get(keyAsString);
 	if (subscribers === void 0) {
 		stored.set(keyAsString, /* @__PURE__ */ new Set([callback]));
-	} else if (!subscribers.has(callback)) {
+	}
+	else if (!subscribers.has(callback)) {
 		subscribers.add(callback);
 	}
 }
@@ -299,6 +308,16 @@ function validateSubscription(store2, key, callback) {
 
 // src/template.js
 var blixt = 'blixt';
+var booleanAttributes = /* @__PURE__ */ new Set([
+	'checked',
+	'disabled',
+	'inert',
+	'multiple',
+	'open',
+	'readonly',
+	'required',
+	'selected',
+]);
 var comment = `<!--${blixt}-->`;
 var data = /* @__PURE__ */ new WeakMap();
 var Expression = class {
@@ -317,14 +336,17 @@ var Template = class {
 	 * @param {...any} expressions
 	 */
 	constructor(strings, ...expressions) {
-		data.set(this, {
-			strings,
-			expressions: {
-				index: 0,
-				original: expressions,
-				values: [],
+		data.set(
+			this,
+			{
+				strings,
+				expressions: {
+					index: 0,
+					original: expressions,
+					values: [],
+				},
 			},
-		});
+		);
 	}
 	/**
 	 * @param {Element|undefined} parent
@@ -357,7 +379,8 @@ function mapAttributes(element, expressions) {
 		}
 		if (attribute.name.startsWith('@')) {
 			setEvent(element, attribute.name, expression);
-		} else {
+		}
+		else {
 			setAttribute(element, attribute.name, expression);
 		}
 	}
@@ -380,13 +403,29 @@ function mapNodes(template2, node) {
 	return node;
 }
 function setAttribute(element, attribute, expression) {
-	observe(expression, value => {
-		if (value === void 0 || value === null) {
-			element.removeAttribute(attribute);
-		} else {
-			element.setAttribute(attribute, value);
-		}
-	});
+	const isBoolean = booleanAttributes.has(attribute);
+	if (isBoolean) {
+		element.removeAttribute(attribute);
+	}
+	observe(
+		expression,
+		value => {
+			if (isBoolean) {
+				element[attribute] =
+					typeof value === 'boolean' ? value : element[attribute];
+				return;
+			}
+			if (attribute === 'value') {
+				element.value = value;
+			}
+			if (value === void 0 || value === null) {
+				element.removeAttribute(attribute);
+			}
+			else {
+				element.setAttribute(attribute, value);
+			}
+		},
+	);
 }
 function setEvent(element, attribute, expression) {
 	const event = getEventData(attribute);
@@ -398,46 +437,51 @@ function setExpression(comment2, expression) {
 		for (const item of from ?? []) {
 			if (from.indexOf(item) === 0) {
 				item.replaceWith(...to);
-			} else {
+			}
+			else {
 				item.remove();
 			}
 		}
 		current = set ? to : null;
 	}
 	let current = null;
-	observe(expression, value => {
-		if (value === void 0 || value === null) {
-			replace(current, [comment2], false);
-			return;
-		}
-		if (Array.isArray(value)) {
-			return;
-		}
-		let node = value instanceof Template ? value.render() : value;
-		if (
-			current?.length === 1 &&
-			current[0] instanceof Text &&
-			!(node instanceof Node)
-		) {
-			if (current[0].textContent !== value) {
-				current[0].textContent = value;
+	observe(
+		expression,
+		value => {
+			if (value === void 0 || value === null) {
+				replace(current, [comment2], false);
+				return;
 			}
-			return;
-		}
-		if (!(node instanceof Node)) {
-			node = document.createTextNode(node);
-		}
-		replace(
-			current ?? [comment2],
-			node instanceof DocumentFragment ? [...node.childNodes] : [node],
-			true,
-		);
-	});
+			if (Array.isArray(value)) {
+				return;
+			}
+			let node = value instanceof Template ? value.render() : value;
+			if (
+				current?.length === 1
+				&& current[0] instanceof Text
+				&& !(node instanceof Node)
+			) {
+				if (current[0].textContent !== value) {
+					current[0].textContent = value;
+				}
+				return;
+			}
+			if (!(node instanceof Node)) {
+				node = document.createTextNode(node);
+			}
+			replace(
+				current ?? [comment2],
+				node instanceof DocumentFragment ? [...node.childNodes] : [node],
+				true,
+			);
+		},
+	);
 }
 function setNode(comment2, expression) {
 	if (expression instanceof Expression) {
 		setExpression(comment2, expression);
-	} else {
+	}
+	else {
 		comment2.replaceWith(
 			expression instanceof Node ? expression : expression.render(),
 		);
@@ -451,9 +495,9 @@ function toString(template2) {
 	function express(value, expression) {
 		const isFunction = typeof expression === 'function';
 		if (
-			isFunction ||
-			expression instanceof Node ||
-			expression instanceof Template
+			isFunction
+			|| expression instanceof Node
+			|| expression instanceof Template
 		) {
 			expressions.values.push(
 				isFunction ? new Expression(expression) : expression,
@@ -470,8 +514,8 @@ function toString(template2) {
 		return value + expression;
 	}
 	let html = '';
-	for (const value of strings) {
-		const index = strings.indexOf(value);
+	for (let index = 0; index < strings.length; index += 1) {
+		const value = strings[index];
 		const expression = expressions.original[index];
 		html += expression === void 0 ? value : express(value, expression);
 	}

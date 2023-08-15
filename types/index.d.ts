@@ -7,7 +7,7 @@ export function isStore(value: any): boolean;
 
 /**
  * Observes changes for properties used in a function
- * @param {{(...args: any[]) => any}} callback
+ * @param {(...args: any[]) => any} callback
  * @param {{(value: any) => void}=} after
  * @returns {void}
  */

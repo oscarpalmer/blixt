@@ -252,7 +252,7 @@ export function isStore(value) {
 
 /**
  * Observes changes for properties used in a function
- * @param {Function} callback
+ * @param {(...args: any[]) => any} callback
  * @param {{(value: any) => void}=} after
  * @returns {void}
  */
