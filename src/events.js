@@ -43,5 +43,5 @@ export function handle(element, attribute, callback) {
 
 	element.addEventListener(event.name, callback, event.options);
 
-	attribute.value = null;
+	element.removeAttribute(attribute.name);
 }

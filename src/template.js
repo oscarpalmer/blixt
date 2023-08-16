@@ -1,5 +1,5 @@
 import {handle as handleEvent} from './events.js';
-import {observe} from './observer.js';
+import {observe, observeAttribute} from './observer.js';
 
 /**
  * @typedef TemplateExpressions
@@ -16,48 +16,42 @@ import {observe} from './observer.js';
 
 const blixt = 'blixt';
 
-const booleanAttributes = new Set([
-	'checked',
-	'disabled',
-	'inert',
-	'multiple',
-	'open',
-	'readonly',
-	'required',
-	'selected',
-]);
-
 const comment = `<!--${blixt}-->`;
 
 /** @type {WeakMap<Template, TemplateData>} */
 const data = new WeakMap();
 
-class Expression {
-	/** @param {Function} callback */
-	constructor(callback) {
-		this.callback = callback;
+export class Expression {
+	/** @type {Function} */
+	#value = null;
+
+	get value() {
+		return this.#value;
 	}
 
-	/** @returns {any} */
-	run() {
-		return this.callback();
+	/** @param {Function} callback */
+	constructor(callback) {
+		this.#value = callback;
 	}
 }
 
-class Template {
+export class Template {
 	/**
 	 * @param {TemplateStringsArray} strings
 	 * @param {...any} expressions
 	 */
 	constructor(strings, ...expressions) {
-		data.set(this, {
-			strings,
-			expressions: {
-				index: 0,
-				original: expressions,
-				values: [],
+		data.set(
+			this,
+			{
+				strings,
+				expressions: {
+					index: 0,
+					original: expressions,
+					values: [],
+				},
 			},
-		});
+		);
 	}
 
 	/**
@@ -112,8 +106,9 @@ function mapAttributes(element, expressions) {
 
 		if (attribute.name.startsWith('@')) {
 			handleEvent(element, attribute, expression.callback);
-		} else {
-			setAttribute(element, attribute.name, expression);
+		}
+		else {
+			observeAttribute(element, attribute, expression);
 		}
 	}
 }
@@ -148,38 +143,6 @@ function mapNodes(template, node) {
 }
 
 /**
- * @param {Element} element
- * @param {string} attribute
- * @param {Expression|Node|Template} expression
- * @returns {void}
- */
-function setAttribute(element, attribute, expression) {
-	const isBoolean = booleanAttributes.has(attribute);
-
-	if (isBoolean) {
-		element.removeAttribute(attribute);
-	}
-
-	observe(expression, value => {
-		if (isBoolean) {
-			element[attribute] = typeof value === 'boolean' ? value : element[attribute];
-
-			return;
-		}
-
-		if (attribute === 'value') {
-			element.value = value;
-		}
-
-		if (value === undefined || value === null) {
-			element.removeAttribute(attribute);
-		} else {
-			element.setAttribute(attribute, value);
-		}
-	});
-}
-
-/**
  * @param {Comment} comment
  * @param {Expression} expression
  * @returns {void}
@@ -194,7 +157,8 @@ function setExpression(comment, expression) {
 		for (const item of from ?? []) {
 			if (from.indexOf(item) === 0) {
 				item.replaceWith(...to);
-			} else {
+			}
+			else {
 				item.remove();
 			}
 		}
@@ -204,44 +168,47 @@ function setExpression(comment, expression) {
 
 	let current = null;
 
-	observe(expression, value => {
-		if (value === undefined || value === null) {
-			replace(current, [comment], false);
+	observe(
+		expression,
+		value => {
+			if (value === undefined || value === null) {
+				replace(current, [comment], false);
 
-			return;
-		}
-
-		// TODO: support arrays
-		// TODO: smarter replace for chunks
-
-		if (Array.isArray(value)) {
-			return;
-		}
-
-		let node = value instanceof Template ? value.render() : value;
-
-		if (
-			current?.length === 1
-			&& current[0] instanceof Text
-			&& !(node instanceof Node)
-		) {
-			if (current[0].textContent !== value) {
-				current[0].textContent = value;
+				return;
 			}
 
-			return;
-		}
+			// TODO: support arrays
+			// TODO: smarter replace for chunks
 
-		if (!(node instanceof Node)) {
-			node = document.createTextNode(node);
-		}
+			if (Array.isArray(value)) {
+				return;
+			}
 
-		replace(
-			current ?? [comment],
-			node instanceof DocumentFragment ? [...node.childNodes] : [node],
-			true,
-		);
-	});
+			let node = value instanceof Template ? value.render() : value;
+
+			if (
+				current?.length === 1
+				&& current[0] instanceof Text
+				&& !(node instanceof Node)
+			) {
+				if (current[0].textContent !== value) {
+					current[0].textContent = value;
+				}
+
+				return;
+			}
+
+			if (!(node instanceof Node)) {
+				node = document.createTextNode(node);
+			}
+
+			replace(
+				current ?? [comment],
+				node instanceof DocumentFragment ? [...node.childNodes] : [node],
+				true,
+			);
+		},
+	);
 }
 
 /**
@@ -252,7 +219,8 @@ function setExpression(comment, expression) {
 function setNode(comment, expression) {
 	if (expression instanceof Expression) {
 		setExpression(comment, expression);
-	} else {
+	}
+	else {
 		comment.replaceWith(
 			expression instanceof Node ? expression : expression.render(),
 		);
