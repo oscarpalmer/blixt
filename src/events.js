@@ -8,7 +8,7 @@
  * @param {string} attribute
  * @returns {EventData}
  */
-function get(attribute) {
+function getData(attribute) {
 	let name = attribute.slice(1);
 
 	/** @type {AddEventListenerOptions} */
@@ -35,13 +35,13 @@ function get(attribute) {
 /**
  * @param {Element} element
  * @param {Attr} attribute
- * @param {Function} callback
+ * @param {import('./template.js').Expression} expression
  * @returns {void}
  */
-export function handle(element, attribute, callback) {
-	const event = get(attribute.name);
+export function handleEvent(element, attribute, expression) {
+	const event = getData(attribute.name);
 
-	element.addEventListener(event.name, callback, event.options);
+	element.addEventListener(event.name, expression.value, event.options);
 
 	element.removeAttribute(attribute.name);
 }

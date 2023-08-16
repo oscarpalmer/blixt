@@ -1,5 +1,5 @@
 import {proxies, subscribe, unsubscribe} from './store.js';
-import {Expression} from './template.js';
+import {Expression, Template} from './template.js';
 
 const attributes = new Set([
 	'checked',
@@ -56,6 +56,75 @@ export function observeAttribute(element, attribute, expression) {
 }
 
 /**
+ * @param {Comment} comment
+ * @param {Expression} expression
+ * @returns {void}
+ */
+export function observeContent(comment, expression) {
+	/**
+	 * @param {Node[]} from
+	 * @param {Node[]} to
+	 * @param {boolean} set
+	 */
+	function replace(from, to, set) {
+		for (const item of from ?? []) {
+			if (from.indexOf(item) === 0) {
+				item.replaceWith(...to);
+			}
+			else {
+				item.remove();
+			}
+		}
+
+		current = set ? to : null;
+	}
+
+	let current = null;
+
+	observe(
+		expression,
+		value => {
+			if (value === undefined || value === null) {
+				replace(current, [comment], false);
+
+				return;
+			}
+
+			// TODO: support arrays
+			// TODO: smarter replace for chunks
+
+			if (Array.isArray(value)) {
+				return;
+			}
+
+			let node = value instanceof Template ? value.render() : value;
+
+			if (
+				current?.length === 1
+				&& current[0] instanceof Text
+				&& !(node instanceof Node)
+			) {
+				if (current[0].textContent !== value) {
+					current[0].textContent = value;
+				}
+
+				return;
+			}
+
+			if (!(node instanceof Node)) {
+				node = document.createTextNode(node);
+			}
+
+			replace(
+				current ?? [comment],
+				node instanceof DocumentFragment ? [...node.childNodes] : [node],
+				true,
+			);
+		},
+	);
+}
+
+/**
  * Observes changes for properties used in a function
  * @param {(...args: any[]) => any} callback
  * @param {{(value: any) => void}=} after
@@ -63,10 +132,8 @@ export function observeAttribute(element, attribute, expression) {
  */
 export function observe(callback, after) {
 	const fn = callback instanceof Expression ? callback.value : callback;
-
 	const hasAfter = typeof after === 'function';
-
-	const id = Symbol(callback);
+	const id = Symbol(undefined);
 
 	const queue = () => {
 		if (frame !== null) {

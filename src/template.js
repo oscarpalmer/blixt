@@ -1,5 +1,5 @@
-import {handle as handleEvent} from './events.js';
-import {observe, observeAttribute} from './observer.js';
+import {handleEvent} from './events.js';
+import {observeAttribute, observeContent} from './observer.js';
 
 /**
  * @typedef TemplateExpressions
@@ -105,7 +105,7 @@ function mapAttributes(element, expressions) {
 		}
 
 		if (attribute.name.startsWith('@')) {
-			handleEvent(element, attribute, expression.callback);
+			handleEvent(element, attribute, expression);
 		}
 		else {
 			observeAttribute(element, attribute, expression);
@@ -144,81 +144,12 @@ function mapNodes(template, node) {
 
 /**
  * @param {Comment} comment
- * @param {Expression} expression
- * @returns {void}
- */
-function setExpression(comment, expression) {
-	/**
-	 * @param {Node[]} from
-	 * @param {Node[]} to
-	 * @param {boolean} set
-	 */
-	function replace(from, to, set) {
-		for (const item of from ?? []) {
-			if (from.indexOf(item) === 0) {
-				item.replaceWith(...to);
-			}
-			else {
-				item.remove();
-			}
-		}
-
-		current = set ? to : null;
-	}
-
-	let current = null;
-
-	observe(
-		expression,
-		value => {
-			if (value === undefined || value === null) {
-				replace(current, [comment], false);
-
-				return;
-			}
-
-			// TODO: support arrays
-			// TODO: smarter replace for chunks
-
-			if (Array.isArray(value)) {
-				return;
-			}
-
-			let node = value instanceof Template ? value.render() : value;
-
-			if (
-				current?.length === 1
-				&& current[0] instanceof Text
-				&& !(node instanceof Node)
-			) {
-				if (current[0].textContent !== value) {
-					current[0].textContent = value;
-				}
-
-				return;
-			}
-
-			if (!(node instanceof Node)) {
-				node = document.createTextNode(node);
-			}
-
-			replace(
-				current ?? [comment],
-				node instanceof DocumentFragment ? [...node.childNodes] : [node],
-				true,
-			);
-		},
-	);
-}
-
-/**
- * @param {Comment} comment
  * @param {Expression|Node|Template} expression
  * @returns {void}
  */
 function setNode(comment, expression) {
 	if (expression instanceof Expression) {
-		setExpression(comment, expression);
+		observeContent(comment, expression);
 	}
 	else {
 		comment.replaceWith(
