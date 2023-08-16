@@ -1,4 +1,4 @@
-import {getEventData} from './helpers.js';
+import {handle as handleEvent} from './events.js';
 import {observe} from './store.js';
 
 /**
@@ -111,7 +111,7 @@ function mapAttributes(element, expressions) {
 		}
 
 		if (attribute.name.startsWith('@')) {
-			setEvent(element, attribute.name, expression);
+			handleEvent(element, attribute, expression.callback);
 		} else {
 			setAttribute(element, attribute.name, expression);
 		}
@@ -177,20 +177,6 @@ function setAttribute(element, attribute, expression) {
 			element.setAttribute(attribute, value);
 		}
 	});
-}
-
-/**
- * @param {Element} element
- * @param {string} attribute
- * @param {Expression} expression
- * @returns {void}
- */
-function setEvent(element, attribute, expression) {
-	const event = getEventData(attribute);
-
-	element.addEventListener(event.name, expression.callback, event.options);
-
-	element.removeAttribute(attribute);
 }
 
 /**
