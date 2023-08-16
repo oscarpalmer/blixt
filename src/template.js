@@ -1,5 +1,5 @@
 import {handle as handleEvent} from './events.js';
-import {observe} from './store.js';
+import {observe} from './observer.js';
 
 /**
  * @typedef TemplateExpressions
