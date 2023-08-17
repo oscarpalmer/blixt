@@ -1,5 +1,4 @@
-import {handleEvent} from './helpers/index.js';
-import {observeAttribute, observeContent} from './observer.js';
+import {createNodes, mapNodes} from './helpers/index.js';
 
 /**
  * @typedef TemplateExpressions
@@ -14,9 +13,8 @@ import {observeAttribute, observeContent} from './observer.js';
  * @property {TemplateStringsArray} strings
  */
 
-const blixt = 'blixt';
-
-const comment = `<!--${blixt}-->`;
+export const blixt = 'blixt';
+export const comment = `<!--${blixt}-->`;
 
 /** @type {WeakMap<Template, TemplateData>} */
 const data = new WeakMap();
@@ -61,100 +59,11 @@ export class Template {
 	render(parent) {
 		const value = toString(this);
 		const rendered = createNodes(value);
-		const mapped = mapNodes(this, rendered);
+		const mapped = mapNodes(data, this, rendered);
 
 		parent?.append(mapped);
 
 		return parent ?? mapped;
-	}
-}
-
-/**
- * @param {string} html
- * @returns {Node}
- */
-function createNodes(html) {
-	const element = document.createElement('template');
-
-	element.innerHTML = html;
-
-	const fragment = element.content.cloneNode(true);
-
-	fragment.normalize();
-
-	return fragment;
-}
-
-/**
- * @param {Element} element
- * @param {TemplateExpressions} expressions
- * @returns {void}
- */
-function mapAttributes(element, expressions) {
-	const attributes = Array.from(element.attributes);
-
-	for (const attribute of attributes) {
-		if (attribute.value !== comment) {
-			continue;
-		}
-
-		const expression = expressions.values[expressions.index++];
-
-		if (!(expression instanceof Expression)) {
-			continue;
-		}
-
-		if (attribute.name.startsWith('@')) {
-			handleEvent(element, attribute, expression);
-		}
-		else {
-			observeAttribute(element, attribute, expression);
-		}
-	}
-}
-
-/**
- * @param {Template} template
- * @param {Node} node
- * @returns {boolean}
- */
-function mapNodes(template, node) {
-	const {expressions} = data.get(template) ?? {};
-
-	const children = Array.from(node.childNodes);
-
-	for (const child of children) {
-		if (child.nodeType === 8 && child.nodeValue === blixt) {
-			setNode(child, expressions.values[expressions.index++]);
-
-			continue;
-		}
-
-		if (child instanceof Element) {
-			mapAttributes(child, expressions);
-		}
-
-		if (child.hasChildNodes()) {
-			mapNodes(template, child);
-		}
-	}
-
-	return node;
-}
-
-/**
- * @param {Comment} comment
- * @param {Expression|Node|Template} expression
- * @returns {void}
- */
-function setNode(comment, expression) {
-	if (expression instanceof Expression) {
-		observeContent(comment, expression);
-	}
-	else {
-		comment.replaceWith(
-			expression instanceof Node ? expression : expression.render(),
-		);
 	}
 }
 
