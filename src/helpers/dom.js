@@ -1,6 +1,22 @@
 import {observeAttribute, observeContent} from '../observer.js';
-import {blixt, comment, Expression} from '../template.js';
+import {blixt, comment, Expression, Template} from '../template.js';
 import {handleEvent} from './events.js';
+
+/**
+ * @param {any} value
+ * @returns {Node}
+ */
+export function createNode(value) {
+	if (value instanceof Node) {
+		return value;
+	}
+
+	if (value instanceof Template) {
+		return value.render();
+	}
+
+	return document.createTextNode(value);
+}
 
 /**
  * @param {string} html
@@ -16,6 +32,21 @@ export function createNodes(html) {
 	fragment.normalize();
 
 	return fragment;
+}
+
+/**
+ * @param {Node|Node[]} node
+ * @returns {Node[]}
+ */
+export function getNodes(node) {
+	const array = Array.isArray(node) ? node : [node];
+
+	return array
+		// eslint-disable-next-line unicorn/prefer-array-flat-map
+		.map(node =>
+			node instanceof DocumentFragment ? [...node.childNodes] : node,
+		)
+		.flat();
 }
 
 /**
@@ -74,6 +105,25 @@ export function mapNodes(data, template, node) {
 	}
 
 	return node;
+}
+
+/**
+ * @param {Node[]} from
+ * @param {Node[]} to
+ * @param {boolean} set
+ * @returns {Node[]|null}
+ */
+export function replaceNodes(from, to, set) {
+	for (const item of from ?? []) {
+		if (from.indexOf(item) === 0) {
+			item.replaceWith(...to);
+		}
+		else {
+			item.remove();
+		}
+	}
+
+	return set ? to : null;
 }
 
 /**

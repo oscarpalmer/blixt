@@ -1,5 +1,6 @@
 import {proxies, subscribe, unsubscribe} from './store.js';
-import {Expression, Template} from './template.js';
+import {Expression} from './template.js';
+import {createNode, getNodes, replaceNodes} from './helpers/dom.js';
 
 const attributes = new Set([
 	'checked',
@@ -61,65 +62,45 @@ export function observeAttribute(element, attribute, expression) {
  * @returns {void}
  */
 export function observeContent(comment, expression) {
-	/**
-	 * @param {Node[]} from
-	 * @param {Node[]} to
-	 * @param {boolean} set
-	 */
-	function replace(from, to, set) {
-		for (const item of from ?? []) {
-			if (from.indexOf(item) === 0) {
-				item.replaceWith(...to);
-			}
-			else {
-				item.remove();
-			}
-		}
-
-		current = set ? to : null;
-	}
-
-	let current = null;
+	let current = [comment];
 
 	observe(
 		expression,
 		value => {
 			if (value === undefined || value === null) {
-				replace(current, [comment], false);
+				current = replaceNodes(current, [comment], false);
 
 				return;
 			}
 
-			// TODO: support arrays
+			// TODO: support arrays, but better ;)
 			// TODO: smarter replace for chunks
 
 			if (Array.isArray(value)) {
+				current = replaceNodes(
+					current ?? [comment],
+					getNodes(value.map(v => createNode(v))),
+					true,
+				);
+
 				return;
 			}
 
-			let node = value instanceof Template ? value.render() : value;
+			const node = createNode(value);
 
 			if (
-				current?.length === 1
+				node instanceof Text
+				&& current?.length === 1
 				&& current[0] instanceof Text
-				&& !(node instanceof Node)
 			) {
-				if (current[0].textContent !== value) {
-					current[0].textContent = value;
+				if (current[0].nodeValue !== node.nodeValue) {
+					current[0].nodeValue = node.nodeValue;
 				}
 
 				return;
 			}
 
-			if (!(node instanceof Node)) {
-				node = document.createTextNode(node);
-			}
-
-			replace(
-				current ?? [comment],
-				node instanceof DocumentFragment ? [...node.childNodes] : [node],
-				true,
-			);
+			current = replaceNodes(current ?? [comment], getNodes(node), true);
 		},
 	);
 }
