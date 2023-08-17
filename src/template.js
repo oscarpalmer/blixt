@@ -1,4 +1,4 @@
-import {handleEvent} from './events.js';
+import {handleEvent} from './helpers/index.js';
 import {observeAttribute, observeContent} from './observer.js';
 
 /**

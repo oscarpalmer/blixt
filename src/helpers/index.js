@@ -1,3 +1,5 @@
+export * from './events.js';
+
 /** @typedef {number|string} Key */
 
 const keyTypes = new Set(['number', 'string']);

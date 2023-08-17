@@ -35,7 +35,7 @@ function getData(attribute) {
 /**
  * @param {Element} element
  * @param {Attr} attribute
- * @param {import('./template.js').Expression} expression
+ * @param {import('../template.js').Expression} expression
  * @returns {void}
  */
 export function handleEvent(element, attribute, expression) {

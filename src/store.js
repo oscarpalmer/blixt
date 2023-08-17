@@ -1,4 +1,4 @@
-import {getKey, getValue, isKey} from './helpers.js';
+import {getKey, getValue, isKey} from './helpers/index.js';
 import {observeKey} from './observer.js';
 
 /**
