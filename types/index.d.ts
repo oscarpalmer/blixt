@@ -1,17 +1,20 @@
 /**
- * Is the value a reactive store?
- * @param {any} value
- * @returns {boolean}
- */
-export function isStore(value: any): boolean;
-
-/**
  * Observes changes for properties used in a function
  * @param {(...args: any[]) => any} callback
  * @param {{(value: any) => void}=} after
  * @returns {void}
  */
-export function observe(callback: (...args: any[]) => any, after?: (value: any) => void): void;
+export function observe(
+	callback: (...args: any[]) => any,
+	after?: (value: any) => void,
+): void;
+
+/**
+ * Is the value a reactive store?
+ * @param {any} value
+ * @returns {boolean}
+ */
+export function isStore(value: any): boolean;
 
 /**
  * Creates a reactive store

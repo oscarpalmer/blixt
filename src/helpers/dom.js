@@ -36,17 +36,14 @@ export function createNodes(html) {
 
 /**
  * @param {Node|Node[]} node
- * @returns {Node[]}
+ * @returns {Array<Node|Node[]>}
  */
 export function getNodes(node) {
 	const array = Array.isArray(node) ? node : [node];
 
-	return array
-		// eslint-disable-next-line unicorn/prefer-array-flat-map
-		.map(node =>
-			node instanceof DocumentFragment ? [...node.childNodes] : node,
-		)
-		.flat();
+	return array.map(node =>
+		node instanceof DocumentFragment ? [...node.childNodes] : node,
+	);
 }
 
 /**
@@ -70,8 +67,7 @@ export function mapAttributes(element, expressions) {
 
 		if (attribute.name.startsWith('@')) {
 			handleEvent(element, attribute, expression);
-		}
-		else {
+		} else {
 			observeAttribute(element, attribute, expression);
 		}
 	}
@@ -114,11 +110,12 @@ export function mapNodes(data, template, node) {
  * @returns {Node[]|null}
  */
 export function replaceNodes(from, to, set) {
-	for (const item of from ?? []) {
-		if (from.indexOf(item) === 0) {
-			item.replaceWith(...to);
-		}
-		else {
+	const items = (from ?? []).flat();
+
+	for (const item of items) {
+		if (items.indexOf(item) === 0) {
+			item.replaceWith(...to.flat());
+		} else {
 			item.remove();
 		}
 	}
@@ -134,8 +131,7 @@ export function replaceNodes(from, to, set) {
 export function setNode(comment, expression) {
 	if (expression instanceof Expression) {
 		observeContent(comment, expression);
-	}
-	else {
+	} else {
 		comment.replaceWith(
 			expression instanceof Node ? expression : expression.render(),
 		);

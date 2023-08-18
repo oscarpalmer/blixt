@@ -39,17 +39,14 @@ export class Template {
 	 * @param {...any} expressions
 	 */
 	constructor(strings, ...expressions) {
-		data.set(
-			this,
-			{
-				strings,
-				expressions: {
-					index: 0,
-					original: expressions,
-					values: [],
-				},
+		data.set(this, {
+			strings,
+			expressions: {
+				index: 0,
+				original: expressions,
+				values: [],
 			},
-		);
+		});
 	}
 
 	/**
@@ -92,9 +89,9 @@ function toString(template) {
 		const isFunction = typeof expression === 'function';
 
 		if (
-			isFunction
-			|| expression instanceof Node
-			|| expression instanceof Template
+			isFunction ||
+			expression instanceof Node ||
+			expression instanceof Template
 		) {
 			expressions.values.push(
 				isFunction ? new Expression(expression) : expression,

@@ -55,84 +55,77 @@ function createStore(data, state, prefix) {
 	const proxyState = isParent ? new State() : state;
 	const proxyValue = transformData(proxyState, prefix, data, isArray);
 
-	const proxy = new Proxy(
-		proxyValue,
-		{
-			get(target, property) {
-				if (property === stateKey) {
-					return proxyState;
-				}
+	const proxy = new Proxy(proxyValue, {
+		get(target, property) {
+			if (property === stateKey) {
+				return proxyState;
+			}
 
-				observeKey(proxyState, getKey(prefix, property));
+			observeKey(proxyState, getKey(prefix, property));
 
-				const value = Reflect.get(target, property);
+			const value = Reflect.get(target, property);
 
-				if (isArray && property in Array.prototype) {
-					return handleArray({
-						prefix,
-						value,
-						array: proxyValue,
-						callback: property,
-						state: proxyState,
-					});
-				}
+			if (isArray && property in Array.prototype) {
+				return handleArray({
+					prefix,
+					value,
+					array: proxyValue,
+					callback: property,
+					state: proxyState,
+				});
+			}
 
-				return value;
-			},
-			has(target, property) {
-				return property === stateKey || Reflect.has(target, property);
-			},
-			set(target, property, value) {
-				const oldValue = Reflect.get(target, property);
-				const newValue = transformItem(proxyState, prefix, property, value);
-				const setValue = Reflect.set(target, property, newValue);
+			return value;
+		},
+		has(target, property) {
+			return property === stateKey || Reflect.has(target, property);
+		},
+		set(target, property, value) {
+			const oldValue = Reflect.get(target, property);
+			const newValue = transformItem(proxyState, prefix, property, value);
+			const setValue = Reflect.set(target, property, newValue);
 
-				if (setValue) {
-					let properties;
-					let values;
+			if (setValue) {
+				let properties;
+				let values;
 
-					if (isStore(oldValue)) {
-						properties = [];
-						values = [];
+				if (isStore(oldValue)) {
+					properties = [];
+					values = [];
 
-						const oldKeys = Object.keys(oldValue);
-						const newKeys = Object.keys(newValue);
+					const oldKeys = Object.keys(oldValue);
+					const newKeys = Object.keys(newValue);
 
-						for (const key of oldKeys) {
-							if (oldValue[key] !== newValue[key]) {
-								properties.push(key);
-								values.push(oldValue[key]);
-							}
-						}
-
-						for (const key of newKeys) {
-							if (!(key in oldValue)) {
-								properties.push(key);
-							}
+					for (const key of oldKeys) {
+						if (oldValue[key] !== newValue[key]) {
+							properties.push(key);
+							values.push(oldValue[key]);
 						}
 					}
 
-					emit(
-						proxyState,
-						properties === undefined ? prefix : getKey(prefix, property),
-						properties ?? [property],
-						values ?? [oldValue],
-					);
+					for (const key of newKeys) {
+						if (!(key in oldValue)) {
+							properties.push(key);
+						}
+					}
 				}
 
-				return setValue;
-			},
-		},
-	);
+				emit(
+					proxyState,
+					properties === undefined ? prefix : getKey(prefix, property),
+					properties ?? [property],
+					values ?? [oldValue],
+				);
+			}
 
-	Object.defineProperty(
-		proxy,
-		stateKey,
-		{
-			value: proxyState,
-			writable: false,
+			return setValue;
 		},
-	);
+	});
+
+	Object.defineProperty(proxy, stateKey, {
+		value: proxyState,
+		writable: false,
+	});
 
 	if (isParent) {
 		proxies.set(proxyState, proxy);
@@ -291,8 +284,7 @@ export function subscribe(store, key, callback) {
 
 	if (subscribers === undefined) {
 		stored.set(keyAsString, new Set([callback]));
-	}
-	else if (!subscribers.has(callback)) {
+	} else if (!subscribers.has(callback)) {
 		subscribers.add(callback);
 	}
 }

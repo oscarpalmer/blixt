@@ -6,8 +6,8 @@
 	"browser": "dist/blixt.iife.js",
 	"description": "⚡️",
 	"devDependencies": {
-		"@marketgridsys/prettier": "^2.9.0-mgs.5",
 		"esbuild": "^0.19",
+		"prettier": "^3.0.0",
 		"xo": "^0.56"
 	},
 	"files": [
@@ -39,11 +39,12 @@
 	"type": "module",
 	"types": "src/index.d.ts",
 	"unpkg": "dist/blixt.iife.js",
-	"version": "0.14.0",
+	"version": "0.15.0",
 	"xo": {
 		"envs": [
 			"browser"
 		],
+		"prettier": true,
 		"rules": {
 			"no-use-extend-native/no-use-extend-native": "off"
 		}

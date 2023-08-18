@@ -13,7 +13,7 @@ const attributes = new Set([
 	'selected',
 ]);
 
-/** @type {Map<symbol, Map<Store<Data>, Set<Key>>>} */
+/** @type {Map<symbol, Map<Store<Data>, Set<import('./helpers/index.js').Key>>>} */
 const observers = new Map();
 
 /**
@@ -31,29 +31,25 @@ export function observeAttribute(element, attribute, expression) {
 		element.removeAttribute(name);
 	}
 
-	observe(
-		expression,
-		value => {
-			if (isBoolean) {
-				if (typeof value === 'boolean') {
-					element[name] = value;
-				}
-
-				return;
+	observe(expression, value => {
+		if (isBoolean) {
+			if (typeof value === 'boolean') {
+				element[name] = value;
 			}
 
-			if (name === 'value') {
-				element.value = value;
-			}
+			return;
+		}
 
-			if (value === undefined || value === null) {
-				element.removeAttribute(name);
-			}
-			else {
-				element.setAttribute(name, value);
-			}
-		},
-	);
+		if (name === 'value') {
+			element.value = value;
+		}
+
+		if (value === undefined || value === null) {
+			element.removeAttribute(name);
+		} else {
+			element.setAttribute(name, value);
+		}
+	});
 }
 
 /**
@@ -62,47 +58,53 @@ export function observeAttribute(element, attribute, expression) {
  * @returns {void}
  */
 export function observeContent(comment, expression) {
-	let current = [comment];
+	function clear() {
+		current = replaceNodes(current, [comment], false);
 
-	observe(
-		expression,
-		value => {
-			if (value === undefined || value === null) {
-				current = replaceNodes(current, [comment], false);
+		return undefined;
+	}
 
-				return;
+	/** @type {Array<Node|Node[]>|null} */
+	let current = null;
+
+	observe(expression, value => {
+		if (value === undefined || value === null) {
+			return clear();
+		}
+
+		// TODO: support arrays, but better ;)
+		// TODO: smarter replace for chunks
+
+		if (Array.isArray(value)) {
+			if (value.length === 0) {
+				return clear();
 			}
 
-			// TODO: support arrays, but better ;)
-			// TODO: smarter replace for chunks
+			current = replaceNodes(
+				current ?? [comment],
+				getNodes(value.map(createNode)),
+				true,
+			);
 
-			if (Array.isArray(value)) {
-				current = replaceNodes(
-					current ?? [comment],
-					getNodes(value.map(v => createNode(v))),
-					true,
-				);
+			return;
+		}
 
-				return;
+		const node = createNode(value);
+
+		if (
+			node instanceof Text &&
+			current?.length === 1 &&
+			current[0] instanceof Text
+		) {
+			if (current[0].nodeValue !== node.nodeValue) {
+				current[0].nodeValue = node.nodeValue;
 			}
 
-			const node = createNode(value);
+			return;
+		}
 
-			if (
-				node instanceof Text
-				&& current?.length === 1
-				&& current[0] instanceof Text
-			) {
-				if (current[0].nodeValue !== node.nodeValue) {
-					current[0].nodeValue = node.nodeValue;
-				}
-
-				return;
-			}
-
-			current = replaceNodes(current ?? [comment], getNodes(node), true);
-		},
-	);
+		current = replaceNodes(current ?? [comment], getNodes(node), true);
+	});
 }
 
 /**
@@ -182,8 +184,7 @@ export function observeKey(state, key) {
 
 		if (keys === undefined) {
 			map.set(proxy, new Set([key]));
-		}
-		else {
+		} else {
 			keys.add(key);
 		}
 	}
