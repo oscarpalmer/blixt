@@ -431,6 +431,7 @@ function validateSubscription(store2, key, callback) {
 var attributes = /* @__PURE__ */ new Set([
 	'checked',
 	'disabled',
+	'hidden',
 	'inert',
 	'multiple',
 	'open',
@@ -442,7 +443,9 @@ var observers = /* @__PURE__ */ new Map();
 function observeAttribute(element, attribute, expression) {
 	const {name} = attribute;
 	const isBoolean = attributes.has(name);
-	if (isBoolean) {
+	const isClass = /^class\./i.test(name);
+	const isStyle = /^style\./i.test(name);
+	if (isBoolean || isClass || isStyle) {
 		element.removeAttribute(name);
 	}
 	observe(expression, value => {
@@ -452,10 +455,32 @@ function observeAttribute(element, attribute, expression) {
 			}
 			return;
 		}
+		if (isClass) {
+			const classes = name.split('.').slice(1);
+			if (value === true) {
+				element.classList.add(...classes);
+			} else {
+				element.classList.remove(...classes);
+			}
+			return;
+		}
+		const remove = value === void 0 || value === null;
+		if (isStyle) {
+			const [, property, suffix] = name.split('.');
+			if (remove || value === false || (value === true && suffix === void 0)) {
+				element.style.removeProperty(property);
+			} else {
+				element.style.setProperty(
+					property,
+					value === true ? suffix : `${value}${suffix ?? ''}`,
+				);
+			}
+			return;
+		}
 		if (name === 'value') {
 			element.value = value;
 		}
-		if (value === void 0 || value === null) {
+		if (remove) {
 			element.removeAttribute(name);
 		} else {
 			element.setAttribute(name, value);
@@ -478,7 +503,7 @@ function observeContent(comment2, expression) {
 			}
 			current = replaceNodes(
 				current ?? [comment2],
-				getNodes(value.map(createNode)),
+				getNodes(value.map(value2 => createNode(value2))),
 				true,
 			);
 			return;

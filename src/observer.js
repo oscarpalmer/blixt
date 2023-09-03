@@ -5,6 +5,7 @@ import {createNode, getNodes, replaceNodes} from './helpers/dom.js';
 const attributes = new Set([
 	'checked',
 	'disabled',
+	'hidden',
 	'inert',
 	'multiple',
 	'open',
@@ -26,8 +27,10 @@ export function observeAttribute(element, attribute, expression) {
 	const {name} = attribute;
 
 	const isBoolean = attributes.has(name);
+	const isClass = /^class\./i.test(name);
+	const isStyle = /^style\./i.test(name);
 
-	if (isBoolean) {
+	if (isBoolean || isClass || isStyle) {
 		element.removeAttribute(name);
 	}
 
@@ -40,11 +43,44 @@ export function observeAttribute(element, attribute, expression) {
 			return;
 		}
 
+		if (isClass) {
+			const classes = name.split('.').slice(1);
+
+			if (value === true) {
+				element.classList.add(...classes);
+			} else {
+				element.classList.remove(...classes);
+			}
+
+			return;
+		}
+
+		const remove = value === undefined || value === null;
+
+		if (isStyle) {
+			const [, property, suffix] = name.split('.');
+
+			if (
+				remove ||
+				value === false ||
+				(value === true && suffix === undefined)
+			) {
+				element.style.removeProperty(property);
+			} else {
+				element.style.setProperty(
+					property,
+					value === true ? suffix : `${value}${suffix ?? ''}`,
+				);
+			}
+
+			return;
+		}
+
 		if (name === 'value') {
 			element.value = value;
 		}
 
-		if (value === undefined || value === null) {
+		if (remove) {
 			element.removeAttribute(name);
 		} else {
 			element.setAttribute(name, value);
@@ -82,7 +118,7 @@ export function observeContent(comment, expression) {
 
 			current = replaceNodes(
 				current ?? [comment],
-				getNodes(value.map(createNode)),
+				getNodes(value.map(value => createNode(value))),
 				true,
 			);
 
