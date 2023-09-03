@@ -95,6 +95,8 @@ export function observeAttribute(element, attribute, expression) {
  */
 export function observeContent(comment, expression) {
 	function clear() {
+		isText = false;
+
 		current = replaceNodes(current, [comment], false);
 
 		return undefined;
@@ -102,20 +104,20 @@ export function observeContent(comment, expression) {
 
 	/** @type {Array<Node|Node[]>|null} */
 	let current = null;
+	let isText = false;
 
 	observe(expression, value => {
-		if (value === undefined || value === null) {
+		const isArray = Array.isArray(value);
+
+		if (
+			value === undefined ||
+			value === null ||
+			(isArray && value.length === 0)
+		) {
 			return clear();
 		}
 
-		// TODO: support arrays, but better ;)
-		// TODO: smarter replace for chunks
-
-		if (Array.isArray(value)) {
-			if (value.length === 0) {
-				return clear();
-			}
-
+		if (isArray) {
 			current = replaceNodes(
 				current ?? [comment],
 				getNodes(value.map(value => createNode(value))),
@@ -127,17 +129,15 @@ export function observeContent(comment, expression) {
 
 		const node = createNode(value);
 
-		if (
-			node instanceof Text &&
-			current?.length === 1 &&
-			current[0] instanceof Text
-		) {
-			if (current[0].nodeValue !== node.nodeValue) {
-				current[0].nodeValue = node.nodeValue;
+		if (isText && node instanceof Text) {
+			if (current[0][0].textContent !== node.textContent) {
+				current[0][0].textContent = node.textContent;
 			}
 
 			return;
 		}
+
+		isText = node instanceof Text;
 
 		current = replaceNodes(current ?? [comment], getNodes(node), true);
 	});

@@ -36,13 +36,13 @@ export function createNodes(html) {
 
 /**
  * @param {Node|Node[]} node
- * @returns {Array<Node|Node[]>}
+ * @returns {Array<Node[]>}
  */
 export function getNodes(node) {
 	const array = Array.isArray(node) ? node : [node];
 
 	return array.map(node =>
-		node instanceof DocumentFragment ? [...node.childNodes] : node,
+		node instanceof DocumentFragment ? [...node.childNodes] : [node],
 	);
 }
 
