@@ -94,14 +94,6 @@ export function observeAttribute(element, attribute, expression) {
  * @returns {void}
  */
 export function observeContent(comment, expression) {
-	function clear() {
-		isText = false;
-
-		current = replaceNodes(current, [comment], false);
-
-		return undefined;
-	}
-
 	/** @type {Array<Node|Node[]>|null} */
 	let current = null;
 	let isText = false;
@@ -109,20 +101,13 @@ export function observeContent(comment, expression) {
 	observe(expression, value => {
 		const isArray = Array.isArray(value);
 
-		if (
-			value === undefined ||
-			value === null ||
-			(isArray && value.length === 0)
-		) {
-			return clear();
-		}
+		if (value === undefined || value === null || isArray) {
+			isText = false;
 
-		if (isArray) {
-			current = replaceNodes(
-				current ?? [comment],
-				getNodes(value.map(value => createNode(value))),
-				true,
-			);
+			current =
+				isArray && value.length > 0
+					? updateArray(comment, current, value)
+					: replaceNodes(current ?? [comment], [comment], false);
 
 			return;
 		}
@@ -224,4 +209,18 @@ export function observeKey(state, key) {
 			keys.add(key);
 		}
 	}
+}
+
+/**
+ * @param {Comment} comment
+ * @param {Array<Node[]>|null} current
+ * @param {any[]} array
+ * @returns {Array<Node[]>}
+ */
+function updateArray(comment, current, array) {
+	return replaceNodes(
+		current ?? [comment],
+		array.map(item => createNode(item)),
+		true,
+	);
 }
