@@ -1,6 +1,6 @@
 var Blixt = (() => {
   var __defProp = Object.defineProperty;
-	var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+  var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 	var __getOwnPropNames = Object.getOwnPropertyNames;
 	var __hasOwnProp = Object.prototype.hasOwnProperty;
 	var __export = (target, all) => {
@@ -42,6 +42,7 @@ var Blixt = (() => {
 	// src/index.js
 	var src_exports = {};
 	__export(src_exports, {
+		Template: () => Template,
 		isStore: () => isStore,
 		observe: () => observe,
 		store: () => store,
@@ -173,7 +174,7 @@ var Blixt = (() => {
 	function getNodes(node) {
 		const array = Array.isArray(node) ? node : [node];
 		return array.map(node2 =>
-			node2 instanceof DocumentFragment ? [...node2.childNodes] : node2,
+			node2 instanceof DocumentFragment ? [...node2.childNodes] : [node2],
 		);
 	}
 	function mapAttributes(element, expressions) {
@@ -336,9 +337,6 @@ var Blixt = (() => {
 	}
 	function emit(state, prefix, properties, values) {
 		const proxy = proxies.get(state);
-		if (proxy === void 0) {
-			return;
-		}
 		const keys = properties.map(property => getKey(prefix, property));
 		const origin = properties.length > 1 ? prefix : keys[0];
 		if (prefix !== void 0) {
@@ -419,11 +417,7 @@ var Blixt = (() => {
 		return createStore(data2);
 	}
 	function subscribe(store2, key, callback) {
-		validateSubscription(store2, key, callback);
 		const stored = subscriptions.get(store2?.[stateKey]);
-		if (stored === void 0) {
-			return;
-		}
 		const keyAsString = String(key);
 		const subscribers = stored.get(keyAsString);
 		if (subscribers === void 0) {
@@ -450,21 +444,9 @@ var Blixt = (() => {
 			: value;
 	}
 	function unsubscribe(store2, key, callback) {
-		validateSubscription(store2, key, callback);
 		const stored = subscriptions.get(store2?.[stateKey]);
 		const subscribers = stored?.get(String(key));
 		subscribers?.delete(callback);
-	}
-	function validateSubscription(store2, key, callback) {
-		if (!isStore(store2)) {
-			throw new TypeError('Store must be a reactive store');
-		}
-		if (!isKey(key)) {
-			throw new TypeError('Key must be a number or string');
-		}
-		if (typeof callback !== 'function') {
-			throw new TypeError('Callback must be a function');
-		}
 	}
 
 	// src/observer.js
@@ -532,37 +514,28 @@ var Blixt = (() => {
 		});
 	}
 	function observeContent(comment2, expression) {
-		function clear() {
-			current = replaceNodes(current, [comment2], false);
-			return void 0;
-		}
 		let current = null;
+		let isText = false;
 		observe(expression, value => {
-			if (value === void 0 || value === null) {
-				return clear();
-			}
-			if (Array.isArray(value)) {
-				if (value.length === 0) {
-					return clear();
-				}
-				current = replaceNodes(
-					current ?? [comment2],
-					getNodes(value.map(value2 => createNode(value2))),
-					true,
-				);
+			const isArray = Array.isArray(value);
+			if (value === void 0 || value === null || isArray) {
+				isText = false;
+				current =
+					isArray && value.length > 0
+						? updateArray(comment2, current, value)
+						: current === null
+						? null
+						: replaceNodes(current, [comment2], false);
 				return;
 			}
 			const node = createNode(value);
-			if (
-				node instanceof Text &&
-				current?.length === 1 &&
-				current[0] instanceof Text
-			) {
-				if (current[0].nodeValue !== node.nodeValue) {
-					current[0].nodeValue = node.nodeValue;
+			if (isText && node instanceof Text) {
+				if (current[0][0].textContent !== node.textContent) {
+					current[0][0].textContent = node.textContent;
 				}
 				return;
 			}
+			isText = node instanceof Text;
 			current = replaceNodes(current ?? [comment2], getNodes(node), true);
 		});
 	}
@@ -571,9 +544,7 @@ var Blixt = (() => {
 		const hasAfter = typeof after === 'function';
 		const id = Symbol(void 0);
 		const queue = () => {
-			if (frame !== null) {
-				cancelAnimationFrame(frame);
-			}
+			cancelAnimationFrame(frame);
 			frame = requestAnimationFrame(() => {
 				frame = null;
 				run();
@@ -616,6 +587,13 @@ var Blixt = (() => {
 				keys.add(key);
 			}
 		}
+	}
+	function updateArray(comment2, current, array) {
+		return replaceNodes(
+			current ?? [comment2],
+			getNodes(array.map(item => createNode(item))),
+			true,
+		);
 	}
 	return __toCommonJS(src_exports);
 })();
