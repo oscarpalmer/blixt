@@ -6,8 +6,10 @@
 	"browser": "dist/blixt.iife.js",
 	"description": "⚡️",
 	"devDependencies": {
+		"@happy-dom/global-registrator": "^10.11",
+		"bun": "^0.8",
 		"esbuild": "^0.19",
-		"prettier": "^3.0.0",
+		"prettier": "^3.0",
 		"xo": "^0.56"
 	},
 	"files": [
@@ -32,6 +34,7 @@
 		"build": "npm run build:esm; npm run build:iife; npm run types",
 		"build:esm": "esbuild ./src/index.js --bundle --format=esm --outfile=./dist/blixt.js --target=es2020",
 		"build:iife": "esbuild ./src/index.js --bundle --format=iife --global-name=Blixt --outfile=./dist/blixt.iife.js --target=es2020",
+		"test": "./node_modules/.bin/bun test --coverage --preload ./test/preload.js",
 		"types": "./node_modules/.bin/tsc ./src/index.js --allowJs --declaration --declarationDir ./types --emitDeclarationOnly",
 		"watch": "esbuild ./src/index.js --bundle --watch --format=esm --main-fields=module,main --outfile=dist/blixt.js --platform=neutral --target=esnext",
 		"xo": "./node_modules/.bin/xo ./src/*.js --env browser"

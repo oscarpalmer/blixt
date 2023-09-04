@@ -1,4 +1,4 @@
-import {getKey, getValue, isKey} from './helpers/index.js';
+import {getKey, getValue} from './helpers/index.js';
 import {observeKey} from './observer.js';
 
 /**
@@ -145,10 +145,6 @@ function createStore(data, state, prefix) {
 function emit(state, prefix, properties, values) {
 	const proxy = proxies.get(state);
 
-	if (proxy === undefined) {
-		return;
-	}
-
 	const keys = properties.map(property => getKey(prefix, property));
 
 	const origin = properties.length > 1 ? prefix : keys[0];
@@ -271,13 +267,7 @@ export function store(data) {
  * @returns {void}
  */
 export function subscribe(store, key, callback) {
-	validateSubscription(store, key, callback);
-
 	const stored = subscriptions.get(store?.[stateKey]);
-
-	if (stored === undefined) {
-		return;
-	}
 
 	const keyAsString = String(key);
 	const subscribers = stored.get(keyAsString);
@@ -334,24 +324,8 @@ function transformItem(state, prefix, key, value) {
  * @returns {void}
  */
 export function unsubscribe(store, key, callback) {
-	validateSubscription(store, key, callback);
-
 	const stored = subscriptions.get(store?.[stateKey]);
 	const subscribers = stored?.get(String(key));
 
 	subscribers?.delete(callback);
-}
-
-function validateSubscription(store, key, callback) {
-	if (!isStore(store)) {
-		throw new TypeError('Store must be a reactive store');
-	}
-
-	if (!isKey(key)) {
-		throw new TypeError('Key must be a number or string');
-	}
-
-	if (typeof callback !== 'function') {
-		throw new TypeError('Callback must be a function');
-	}
 }

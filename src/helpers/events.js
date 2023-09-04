@@ -8,7 +8,7 @@
  * @param {string} attribute
  * @returns {EventData}
  */
-function getData(attribute) {
+export function getData(attribute) {
 	let name = attribute.slice(1);
 
 	/** @type {AddEventListenerOptions} */

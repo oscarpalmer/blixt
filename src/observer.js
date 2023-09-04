@@ -107,7 +107,9 @@ export function observeContent(comment, expression) {
 			current =
 				isArray && value.length > 0
 					? updateArray(comment, current, value)
-					: replaceNodes(current ?? [comment], [comment], false);
+					: current === null
+					? null
+					: replaceNodes(current, [comment], false);
 
 			return;
 		}
@@ -140,9 +142,7 @@ export function observe(callback, after) {
 	const id = Symbol(undefined);
 
 	const queue = () => {
-		if (frame !== null) {
-			cancelAnimationFrame(frame);
-		}
+		cancelAnimationFrame(frame);
 
 		frame = requestAnimationFrame(() => {
 			frame = null;
@@ -217,10 +217,10 @@ export function observeKey(state, key) {
  * @param {any[]} array
  * @returns {Array<Node[]>}
  */
-function updateArray(comment, current, array) {
+export function updateArray(comment, current, array) {
 	return replaceNodes(
 		current ?? [comment],
-		array.map(item => createNode(item)),
+		getNodes(array.map(item => createNode(item))),
 		true,
 	);
 }
