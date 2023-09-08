@@ -1,52 +1,42 @@
-import {getKey, getValue} from './helpers/index.js';
-import {observeKey} from './observer.js';
+import {type Key, getKey, getString, getValue} from './helpers';
+import {observeKey} from './observer';
 
-/**
- * @typedef ArrayParameters
- * @property {Array} array
- * @property {string} callback
- * @property {State} state
- * @property {string} prefix
- * @property {any} value
- */
+type ArrayParameters = {
+	array: unknown[];
+	callback: string;
+	state: State;
+	prefix: string;
+	value: unknown;
+};
 
-/** @typedef {{[index: number]: any; [key: string]: any}} Data */
+export type Data = {[index: number]: unknown; [key: string]: unknown};
 
-/** @typedef {number|string} Key */
+export type Store<T extends Data> = {
+	[K in keyof T]: T[K] extends Data ? Store<T[K]> : T[K];
+} & Data;
 
-/**
- * @typedef {{[K in keyof T]: T[K] extends Data ? Store<T[K]> : T[K]} & Data} Store<T>
- * @template T
- */
+type Subscriber = (
+	newValue: unknown,
+	oldValue?: unknown,
+	origin?: string,
+) => void;
 
-/**
- * @callback Subscriber
- * @param {any} newValue
- * @param {any=} oldValue
- * @param {string=} origin
- * @returns {void}
- */
-
-/** @type {WeakMap<State, ProxyConstructor>} */
-export const proxies = new WeakMap();
+export const proxies = new WeakMap<State, ProxyConstructor>();
 
 const stateKey = '__state';
 
-/** @type {WeakMap<State, Map<string, Set<Subscriber>>} */
-const subscriptions = new WeakMap();
+const subscriptions = new WeakMap<State, Map<string, Set<Subscriber>>>();
 
-class State {}
+// eslint-disable-next-line @typescript-eslint/no-extraneous-class
+export class State {}
 
-/**
- * @template {Data} T
- * @param {T} data
- * @param {State|undefined} state
- * @param {Key|undefined} prefix
- * @returns {Store<T>}
- */
-function createStore(data, state, prefix) {
+function createStore<T extends Data>(
+	data: T,
+	state?: State,
+	prefix?: string,
+): Store<T> {
 	if (isStore(data)) {
-		return data;
+		return data as Store<T>;
 	}
 
 	const isArray = Array.isArray(data);
@@ -63,14 +53,14 @@ function createStore(data, state, prefix) {
 
 			observeKey(proxyState, getKey(prefix, property));
 
-			const value = Reflect.get(target, property);
+			const value = Reflect.get(target, property) as unknown;
 
 			if (isArray && property in Array.prototype) {
 				return handleArray({
-					prefix,
 					value,
-					array: proxyValue,
-					callback: property,
+					array: proxyValue as unknown[],
+					callback: getString(property),
+					prefix: prefix ?? '',
 					state: proxyState,
 				});
 			}
@@ -81,7 +71,7 @@ function createStore(data, state, prefix) {
 			return property === stateKey || Reflect.has(target, property);
 		},
 		set(target, property, value) {
-			const oldValue = Reflect.get(target, property);
+			const oldValue = Reflect.get(target, property) as unknown;
 			const newValue = transformItem(proxyState, prefix, property, value);
 			const setValue = Reflect.set(target, property, newValue);
 
@@ -93,18 +83,20 @@ function createStore(data, state, prefix) {
 					properties = [];
 					values = [];
 
-					const oldKeys = Object.keys(oldValue);
-					const newKeys = Object.keys(newValue);
+					const oldKeys = Object.keys(oldValue as Store<Data>);
+					const newKeys = Object.keys(newValue as Store<Data>);
 
 					for (const key of oldKeys) {
-						if (oldValue[key] !== newValue[key]) {
+						if (
+							(oldValue as Store<Data>)[key] !== (newValue as Store<Data>)[key]
+						) {
 							properties.push(key);
-							values.push(oldValue[key]);
+							values.push((oldValue as Store<Data>)[key]);
 						}
 					}
 
 					for (const key of newKeys) {
-						if (!(key in oldValue)) {
+						if (!(key in (oldValue as Store<Data>))) {
 							properties.push(key);
 						}
 					}
@@ -128,21 +120,19 @@ function createStore(data, state, prefix) {
 	});
 
 	if (isParent) {
-		proxies.set(proxyState, proxy);
+		proxies.set(proxyState, proxy as never);
 		subscriptions.set(proxyState, new Map());
 	}
 
-	return proxy;
+	return proxy as Store<T>;
 }
 
-/**
- * @param {State} state
- * @param {Key|undefined} prefix
- * @param {Key[]} properties
- * @param {any[]} values
- * @returns {void}
- */
-function emit(state, prefix, properties, values) {
+function emit(
+	state: State,
+	prefix: string | undefined,
+	properties: Key[],
+	values: unknown[],
+): void {
 	const proxy = proxies.get(state);
 
 	const keys = properties.map(property => getKey(prefix, property));
@@ -153,21 +143,25 @@ function emit(state, prefix, properties, values) {
 		const parts = prefix.split('.');
 
 		keys.push(
-			...parts.map((_, index) => parts.slice(0, index + 1).join('.')).reverse(),
+			...parts
+				.map((_: unknown, index: number) => parts.slice(0, index + 1).join('.'))
+				.reverse(),
 		);
 	}
 
 	for (const key of keys) {
-		const callbacks = subscriptions.get(state)?.get(key);
+		const subscribers = subscriptions.get(state)?.get(key);
 
-		if (callbacks === undefined) {
+		if (subscribers === undefined) {
 			continue;
 		}
 
+		const callbacks = Array.from(subscribers);
+
 		const emitOrigin = key === origin ? undefined : origin;
 
-		const newValue = getValue(proxy, key);
-		const oldValue = values[keys.indexOf(key)] ?? undefined;
+		const newValue = getValue(proxy, key) as unknown;
+		const oldValue = (values[keys.indexOf(key)] as unknown) ?? undefined;
 
 		for (const callback of callbacks) {
 			callback(newValue, oldValue, emitOrigin);
@@ -175,14 +169,10 @@ function emit(state, prefix, properties, values) {
 	}
 }
 
-/**
- * @param {ArrayParameters} parameters
- * @returns {any}
- */
-function handleArray(parameters) {
-	const {array, callback, state, prefix, value} = parameters;
+function handleArray(parameters: ArrayParameters): unknown {
+	const {array, callback, state, prefix} = parameters;
 
-	function synthetic(...args) {
+	function synthetic(...args: unknown[]) {
 		const oldArray = array.slice(0);
 
 		const result = Array.prototype[callback].call(array, ...args);
@@ -205,7 +195,7 @@ function handleArray(parameters) {
 
 		emit(state, prefix, properties, values);
 
-		return result;
+		return result as unknown;
 	}
 
 	switch (callback) {
@@ -220,37 +210,36 @@ function handleArray(parameters) {
 		case 'fill':
 		case 'push':
 		case 'unshift': {
-			return (...items) =>
-				synthetic(...transformData(state, prefix, items, true));
+			return (...items: unknown[]) =>
+				synthetic(...(transformData(state, prefix, items, true) as unknown[]));
 		}
 
 		case 'splice': {
-			return (start, remove, ...items) =>
-				synthetic(start, remove, ...transformData(state, prefix, items, true));
+			return (start: number, remove: number, ...items: unknown[]) =>
+				synthetic(
+					start,
+					remove,
+					...(transformData(state, prefix, items, true) as unknown[]),
+				);
 		}
 
 		default: {
-			return value;
+			return parameters.value;
 		}
 	}
 }
 
 /**
  * Is the value a reactive store?
- * @param {any} value
- * @returns {boolean}
  */
-export function isStore(value) {
+export function isStore(value: unknown): boolean {
 	return value?.[stateKey] instanceof State;
 }
 
 /**
  * Creates a reactive store
- * @template {Data} T
- * @param {T} data
- * @returns {Store<T>}
  */
-export function store(data) {
+export function store<T extends Data>(data: T): Store<T> {
 	if (typeof data !== 'object') {
 		throw new TypeError('Data must be an object');
 	}
@@ -260,14 +249,17 @@ export function store(data) {
 
 /**
  * Subscribes to value changes for a key in a store
- * @template {Data} T
- * @param {Store<T>} store
- * @param {Key} key
- * @param {Subscriber} callback
- * @returns {void}
  */
-export function subscribe(store, key, callback) {
-	const stored = subscriptions.get(store?.[stateKey]);
+export function subscribe<T extends Data>(
+	store: Store<T>,
+	key: Key,
+	callback: Subscriber,
+): void {
+	const stored = subscriptions.get(store?.[stateKey] as State);
+
+	if (stored === undefined) {
+		return;
+	}
 
 	const keyAsString = String(key);
 	const subscribers = stored.get(keyAsString);
@@ -279,52 +271,55 @@ export function subscribe(store, key, callback) {
 	}
 }
 
-/**
- * @param {State} state
- * @param {Key|undefined} prefix
- * @param {object} data
- * @param {boolean} isArray
- * @returns {object}
- */
-function transformData(state, prefix, data, isArray) {
-	const value = isArray ? [] : Object.create(data, {});
+function transformData(
+	state: State,
+	prefix: Key | undefined,
+	data: unknown[] | Record<string, unknown>,
+	isArray: boolean,
+): unknown[] | Record<string, unknown> {
+	const value = (isArray ? [] : Object.create(data, {})) as Record<
+		number | string,
+		unknown
+	>;
 
 	for (const key in data) {
 		if (key in data) {
-			value[key] = transformItem(state, prefix, key, data[key]);
+			value[key] = transformItem(
+				state,
+				prefix,
+				key,
+				(data as Record<string, unknown>)[key],
+			);
 		}
 	}
 
 	return value;
 }
 
-/**
- * @param {State} state
- * @param {Key|undefined} prefix
- * @param {Key} key
- * @param {any} value
- * @returns {any}
- */
-function transformItem(state, prefix, key, value) {
+function transformItem(
+	state: State,
+	prefix: Key | undefined,
+	key: Key,
+	value: unknown,
+): unknown {
 	if (value === undefined || value === null) {
 		return value;
 	}
 
 	return typeof value === 'object'
-		? createStore(value, state, getKey(prefix, key))
+		? createStore(value as never, state, getKey(prefix, key))
 		: value;
 }
 
 /**
  * Unsubscribes from value changes for a key in a store
- * @template {Data} T
- * @param {Store<T>} store
- * @param {Key} key
- * @param {Subscriber} callback
- * @returns {void}
  */
-export function unsubscribe(store, key, callback) {
-	const stored = subscriptions.get(store?.[stateKey]);
+export function unsubscribe<T extends Data>(
+	store: Store<T>,
+	key: Key,
+	callback: Subscriber,
+): void {
+	const stored = subscriptions.get(store?.[stateKey] as State);
 	const subscribers = stored?.get(String(key));
 
 	subscribers?.delete(callback);

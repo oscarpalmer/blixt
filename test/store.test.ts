@@ -1,5 +1,5 @@
 import {expect, test} from 'bun:test';
-import {store, subscribe, unsubscribe} from '../src/store.js';
+import {store, subscribe, unsubscribe} from '../src/store';
 
 const key = 'nested.key';
 
@@ -55,6 +55,7 @@ test('array', () => {
 
 test('store', () => {
 	try {
+		// @ts-expect-error Testing invalid input
 		store(123);
 	} catch (error) {
 		expect(error).toBeInstanceOf(TypeError);
@@ -62,6 +63,7 @@ test('store', () => {
 
 	expect(store(stored)).toEqual(stored);
 
+	// @ts-expect-error Testing data rewrite
 	stored.nested.object = {
 		d: 4,
 	};

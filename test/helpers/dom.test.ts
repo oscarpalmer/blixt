@@ -1,6 +1,6 @@
 import {expect, test} from 'bun:test';
-import {Template} from '../../src/template.js';
-import {createNode, getNodes, replaceNodes} from '../../src/helpers/dom.js';
+import {template, Template} from '../../src/template';
+import {createNode, getNodes, replaceNodes} from '../../src/helpers/dom';
 
 test('createNode:text', () => {
 	const text = createNode('test');
@@ -17,11 +17,11 @@ test('createNode:node', () => {
 	const node = createNode(element);
 
 	expect(node).toBeInstanceOf(HTMLDivElement);
-	expect(node.innerHTML).toEqual('Hello, world');
+	expect(node.textContent).toEqual('Hello, world');
 });
 
 test('createNode:template', () => {
-	const templated = new Template(['<p>Hello, world</p>']);
+	const templated = template`<p>Hello, world</p>`;
 
 	const node = createNode(templated);
 
@@ -57,7 +57,7 @@ test('getNodes', () => {
 test('replaceNodes', () => {
 	const callbacks = [
 		value => {
-			expect(replaceNodes(value, [], false)).toBe(null);
+			expect(replaceNodes(value, [], false)).toBe(undefined);
 		},
 		value => {
 			expect(replaceNodes(value, [], true)).toBeInstanceOf(Array);

@@ -1,6 +1,8 @@
-import {proxies, subscribe, unsubscribe} from './store.js';
-import {Expression} from './template.js';
-import {createNode, getNodes, replaceNodes} from './helpers/dom.js';
+import {proxies, subscribe, unsubscribe} from './store';
+import type {Data, State, Store} from './store';
+import {type Expression} from './template';
+import {getString, type Key} from './helpers';
+import {createNode, getNodes, replaceNodes} from './helpers/dom';
 
 const attributes = new Set([
 	'checked',
@@ -14,16 +16,13 @@ const attributes = new Set([
 	'selected',
 ]);
 
-/** @type {Map<symbol, Map<Store<Data>, Set<import('./helpers/index.js').Key>>>} */
-const observers = new Map();
+const observers = new Map<symbol, Map<Store<Data>, Set<Key>>>();
 
-/**
- * @param {Element} element
- * @param {Attr} attribute
- * @param {Expression} expression
- * @returns {void}
- */
-export function observeAttribute(element, attribute, expression) {
+export function observeAttribute(
+	element: HTMLElement,
+	attribute: Attr,
+	expression: Expression,
+): void {
 	const {name} = attribute;
 
 	const isBoolean = attributes.has(name);
@@ -34,10 +33,10 @@ export function observeAttribute(element, attribute, expression) {
 		element.removeAttribute(name);
 	}
 
-	observe(expression, value => {
+	observe(expression.value, (value: unknown) => {
 		if (isBoolean) {
 			if (typeof value === 'boolean') {
-				element[name] = value;
+				(element as unknown as Record<string, unknown>)[name] = value;
 			}
 
 			return;
@@ -77,28 +76,22 @@ export function observeAttribute(element, attribute, expression) {
 		}
 
 		if (name === 'value') {
-			element.value = value;
+			(element as HTMLInputElement).value = getString(value);
 		}
 
 		if (remove) {
 			element.removeAttribute(name);
 		} else {
-			element.setAttribute(name, value);
+			element.setAttribute(name, getString(value));
 		}
 	});
 }
 
-/**
- * @param {Comment} comment
- * @param {Expression} expression
- * @returns {void}
- */
-export function observeContent(comment, expression) {
-	/** @type {Array<Node|Node[]>|null} */
-	let current = null;
+export function observeContent(comment: Comment, expression: Expression): void {
+	let current: Node[][] | undefined;
 	let isText = false;
 
-	observe(expression, value => {
+	observe(expression.value, (value: unknown) => {
 		const isArray = Array.isArray(value);
 
 		if (value === undefined || value === null || isArray) {
@@ -107,16 +100,16 @@ export function observeContent(comment, expression) {
 			current =
 				isArray && value.length > 0
 					? updateArray(comment, current, value)
-					: current === null
-					? null
-					: replaceNodes(current, [comment], false);
+					: current === undefined
+					? undefined
+					: replaceNodes(current, [[comment]], false)!;
 
 			return;
 		}
 
 		const node = createNode(value);
 
-		if (isText && node instanceof Text) {
+		if (current !== undefined && isText && node instanceof Text) {
 			if (current[0][0].textContent !== node.textContent) {
 				current[0][0].textContent = node.textContent;
 			}
@@ -126,56 +119,63 @@ export function observeContent(comment, expression) {
 
 		isText = node instanceof Text;
 
-		current = replaceNodes(current ?? [comment], getNodes(node), true);
+		current = replaceNodes(current ?? [[comment]], getNodes(node), true);
 	});
 }
 
 /**
  * Observes changes for properties used in a function
- * @param {(...args: any[]) => any} callback
- * @param {{(value: any) => void}=} after
- * @returns {void}
  */
-export function observe(callback, after) {
-	const fn = callback instanceof Expression ? callback.value : callback;
+export function observe(
+	callback: () => unknown,
+	after: (value: unknown) => unknown,
+): unknown {
 	const hasAfter = typeof after === 'function';
 	const id = Symbol(undefined);
 
 	const queue = () => {
-		cancelAnimationFrame(frame);
+		if (frame !== undefined) {
+			cancelAnimationFrame(frame);
+		}
 
 		frame = requestAnimationFrame(() => {
-			frame = null;
+			frame = undefined;
 
 			run();
 		});
 	};
 
-	/** @type {Map<Store<Data>, Set<Key>>} */
-	let current = observers.get(id) ?? new Map();
+	let current = observers.get(id) ?? new Map<Store<Data>, Set<Key>>();
 
-	/** @type {number|null} */
-	let frame = null;
+	let frame: number | undefined;
 
-	function run() {
+	function run(): unknown {
 		observers.set(id, new Map());
 
-		const value = fn();
+		const value = callback() as never;
 
-		const observed = observers.get(id) ?? new Map();
+		const observed = observers.get(id) ?? new Map<Store<Data>, Set<Key>>();
 
-		for (const [proxy, keys] of current.entries()) {
+		const currentEntries = Array.from(current.entries());
+
+		for (const [proxy, keys] of currentEntries) {
 			const newKeys = observed.get(proxy) ?? new Set();
 
-			for (const key of keys) {
+			const keysValues = Array.from(keys.values());
+
+			for (const key of keysValues) {
 				if (!newKeys.has(key)) {
 					unsubscribe(proxy, key, queue);
 				}
 			}
 		}
 
-		for (const [proxy, keys] of observed.entries()) {
-			for (const key of keys) {
+		const observedEntries = Array.from(observed.entries());
+
+		for (const [proxy, keys] of observedEntries) {
+			const keysValues = Array.from(keys.values());
+
+			for (const key of keysValues) {
 				subscribe(proxy, key, queue);
 			}
 		}
@@ -188,39 +188,34 @@ export function observe(callback, after) {
 	return run();
 }
 
-/**
- * @param {State} state
- * @param {Key} key
- * @returns {void}
- */
-export function observeKey(state, key) {
+export function observeKey(state: State, key: Key): void {
 	const proxy = proxies.get(state);
 
 	if (proxy === undefined) {
 		return;
 	}
 
-	for (const map of observers.values()) {
-		const keys = map.get(proxy);
+	const values = Array.from(observers.values());
+
+	for (const map of values) {
+		const keys = map.get(proxy as never);
 
 		if (keys === undefined) {
-			map.set(proxy, new Set([key]));
+			map.set(proxy as never, new Set([key]));
 		} else {
 			keys.add(key);
 		}
 	}
 }
 
-/**
- * @param {Comment} comment
- * @param {Array<Node[]>|null} current
- * @param {any[]} array
- * @returns {Array<Node[]>}
- */
-export function updateArray(comment, current, array) {
+export function updateArray(
+	comment: Comment,
+	current: Node[][] | undefined,
+	array: unknown[],
+): Node[][] {
 	return replaceNodes(
-		current ?? [comment],
+		current ?? [[comment]],
 		getNodes(array.map(item => createNode(item))),
 		true,
-	);
+	)!;
 }

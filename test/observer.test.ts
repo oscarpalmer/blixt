@@ -1,8 +1,8 @@
 import {expect, test} from 'bun:test';
-import {store} from '../src/store.js';
-import {template} from '../src/template.js';
+import {store} from '../src/store';
+import {template} from '../src/template';
 
-const context = document.createDocumentFragment();
+const context = document.createElement('body');
 
 const stored = store({
 	array: [1, 2, 3],

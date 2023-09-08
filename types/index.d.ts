@@ -1,38 +1,42 @@
 /**
  * Observes changes for properties used in a function
- * @param {(...args: any[]) => any} callback
- * @param {{(value: any) => void}=} after
- * @returns {void}
  */
-export function observe(
-	callback: (...args: any[]) => any,
-	after?: (value: any) => void,
-): void;
+export declare function observe(
+	callback: () => unknown,
+	after: (value: unknown) => unknown,
+): unknown;
+
+export type Key = string | number | symbol;
+
+export type Data = {
+	[index: number]: unknown;
+	[key: string]: unknown;
+};
+
+export type Store<T extends Data> = {
+	[K in keyof T]: T[K] extends Data ? Store<T[K]> : T[K];
+} & Data;
+
+type Subscriber = (
+	newValue: unknown,
+	oldValue?: unknown,
+	origin?: string,
+) => void;
 
 /**
  * Is the value a reactive store?
- * @param {any} value
- * @returns {boolean}
  */
-export function isStore(value: any): boolean;
+export declare function isStore(value: unknown): boolean;
 
 /**
  * Creates a reactive store
- * @template {Data} T
- * @param {T} data
- * @returns {Store<T>}
  */
-export function store<T extends Data>(data: T): Store<T>;
+export declare function store<T extends Data>(data: T): Store<T>;
 
 /**
  * Subscribes to value changes for a key in a store
- * @template {Data} T
- * @param {Store<T>} store
- * @param {Key} key
- * @param {Subscriber} callback
- * @returns {void}
  */
-export function subscribe<T extends Data>(
+export declare function subscribe<T extends Data>(
 	store: Store<T>,
 	key: Key,
 	callback: Subscriber,
@@ -40,56 +44,22 @@ export function subscribe<T extends Data>(
 
 /**
  * Unsubscribes from value changes for a key in a store
- * @template {Data} T
- * @param {Store<T>} store
- * @param {Key} key
- * @param {Subscriber} callback
- * @returns {void}
  */
-export function unsubscribe<T extends Data>(
+export declare function unsubscribe<T extends Data>(
 	store: Store<T>,
 	key: Key,
 	callback: Subscriber,
 ): void;
 
-export type Data = {
-	[index: number]: any;
-	[key: string]: any;
-};
-
-export type Key = number | string;
-
-export type Store<T> = {
-	[K in keyof T]: T[K] extends Data ? Store<T[K]> : T[K];
-} & Data;
-
-export type Subscriber = (
-	newValue: any,
-	oldValue?: any | undefined,
-	origin?: string | undefined,
-) => void;
+export declare class Template {
+	constructor(strings: TemplateStringsArray, expressions: unknown[]);
+	render(parent?: Element): Node;
+}
 
 /**
  * Renders a template
- * @param {TemplateStringsArray} strings
- * @param {...any} expressions
- * @returns {Template}
  */
-export function template(
+export declare function template(
 	strings: TemplateStringsArray,
-	...expressions: any[]
+	...expressions: unknown[]
 ): Template;
-
-declare class Template {
-	/**
-	 * @param {TemplateStringsArray} strings
-	 * @param {...any} expressions
-	 */
-	constructor(strings: TemplateStringsArray, ...expressions: any[]);
-
-	/**
-	 * @param {Element|undefined} parent
-	 * @returns {Node|undefined}
-	 */
-	render(parent: Element | undefined): Node | undefined;
-}

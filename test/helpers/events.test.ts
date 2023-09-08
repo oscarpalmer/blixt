@@ -1,5 +1,5 @@
 import {expect, test} from 'bun:test';
-import {getData, handleEvent} from '../../src/helpers/events.js';
+import {getData, handleEvent} from '../../src/helpers/events';
 
 test('getData', () => {
 	const simple = getData('@click');

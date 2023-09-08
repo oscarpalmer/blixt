@@ -6,10 +6,12 @@
 	"browser": "dist/blixt.iife.js",
 	"description": "⚡️",
 	"devDependencies": {
-		"@happy-dom/global-registrator": "^10.11",
-		"bun": "^0.8",
+		"@happy-dom/global-registrator": "^11.0",
+		"@ava/typescript": "^4.1",
+		"bun": "^1.0",
 		"esbuild": "^0.19",
 		"prettier": "^3.0",
+		"typescript": "^5.2",
 		"xo": "^0.56"
 	},
 	"files": [
@@ -26,18 +28,26 @@
 	"main": "dist/blixt.iife.js",
 	"module": "dist/blixt.js",
 	"name": "@oscarpalmer/blixt",
+	"prettier": {
+		"arrowParens": "avoid",
+		"bracketSpacing": false,
+		"singleQuote": true,
+		"switchIndent": true,
+		"trailingComma": "all",
+		"useTabs": true
+	},
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/oscarpalmer/blixt.git"
 	},
 	"scripts": {
 		"build": "npm run build:esm; npm run build:iife; npm run types",
-		"build:esm": "esbuild ./src/index.js --bundle --format=esm --outfile=./dist/blixt.js --target=es2020",
-		"build:iife": "esbuild ./src/index.js --bundle --format=iife --global-name=Blixt --outfile=./dist/blixt.iife.js --target=es2020",
-		"test": "./node_modules/.bin/bun test --coverage --preload ./test/preload.js",
-		"types": "./node_modules/.bin/tsc ./src/index.js --allowJs --declaration --declarationDir ./types --emitDeclarationOnly",
-		"watch": "esbuild ./src/index.js --bundle --watch --format=esm --main-fields=module,main --outfile=dist/blixt.js --platform=neutral --target=esnext",
-		"xo": "./node_modules/.bin/xo ./src/*.js --env browser"
+		"build:esm": "esbuild ./src/index.ts --bundle --format=esm --outfile=./dist/blixt.js --target=es2020",
+		"build:iife": "esbuild ./src/index.ts --bundle --format=iife --global-name=Blixt --outfile=./dist/blixt.iife.js --target=es2020",
+		"test": "bun test --coverage --preload ./test/preload.ts",
+		"types": "tsc ./src/index.ts --declaration --declarationDir ./types --emitDeclarationOnly",
+		"watch": "esbuild ./src/index.ts --bundle --watch --format=esm --main-fields=module,main --outfile=dist/blixt.js --platform=neutral --target=esnext",
+		"xo": "xo ./src/*.ts ./src/**/*.ts --env browser"
 	},
 	"type": "module",
 	"types": "src/index.d.ts",
@@ -49,7 +59,7 @@
 		],
 		"prettier": true,
 		"rules": {
-			"no-use-extend-native/no-use-extend-native": "off"
+			"import/no-cycle": "off"
 		}
 	}
 }
