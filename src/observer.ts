@@ -68,7 +68,7 @@ export function observeAttribute(
 			} else {
 				element.style.setProperty(
 					property,
-					value === true ? suffix : `${value}${suffix ?? ''}`,
+					value === true ? suffix : `${getString(value)}${suffix ?? ''}`,
 				);
 			}
 
@@ -134,9 +134,7 @@ export function observe(
 	const id = Symbol(undefined);
 
 	const queue = () => {
-		if (frame !== undefined) {
-			cancelAnimationFrame(frame);
-		}
+		cancelAnimationFrame(frame!);
 
 		frame = requestAnimationFrame(() => {
 			frame = undefined;

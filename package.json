@@ -52,14 +52,16 @@
 	"type": "module",
 	"types": "src/index.d.ts",
 	"unpkg": "dist/blixt.iife.js",
-	"version": "0.17.0",
+	"version": "0.18.0",
 	"xo": {
 		"envs": [
 			"browser"
 		],
 		"prettier": true,
 		"rules": {
-			"import/no-cycle": "off"
+			"import/extensions": "off",
+			"import/no-cycle": "off",
+			"no-use-extend-native/no-use-extend-native": "off"
 		}
 	}
 }

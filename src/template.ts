@@ -1,3 +1,4 @@
+import {getString} from './helpers';
 import {createNodes, mapNodes} from './helpers/dom';
 
 export type TemplateExpressionValue = Expression | Node | Template;
@@ -87,7 +88,7 @@ function toString(template: Template): string {
 			return value + expressed;
 		}
 
-		return value + expression;
+		return value + getString(expression);
 	}
 
 	let html = '';

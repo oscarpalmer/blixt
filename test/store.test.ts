@@ -80,6 +80,13 @@ test('subscribe', () => {
 	subscribe(stored, key, onKey);
 
 	stored.nested.key += 1;
+
+	try {
+		// @ts-expect-error Testing invalid input
+		subscribe(123, 'abc', null);
+	} catch (error) {
+		expect(error).toBeInstanceOf(TypeError);
+	}
 });
 
 test('unsubscribe', () => {

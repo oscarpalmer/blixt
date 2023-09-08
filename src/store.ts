@@ -160,8 +160,8 @@ function emit(
 
 		const emitOrigin = key === origin ? undefined : origin;
 
-		const newValue = getValue(proxy, key) as unknown;
-		const oldValue = (values[keys.indexOf(key)] as unknown) ?? undefined;
+		const newValue = getValue(proxy, key);
+		const oldValue = values[keys.indexOf(key)] ?? undefined;
 
 		for (const callback of callbacks) {
 			callback(newValue, oldValue, emitOrigin);
@@ -175,7 +175,7 @@ function handleArray(parameters: ArrayParameters): unknown {
 	function synthetic(...args: unknown[]) {
 		const oldArray = array.slice(0);
 
-		const result = Array.prototype[callback].call(array, ...args);
+		const result: unknown = Array.prototype[callback].call(array, ...args);
 
 		const properties = [];
 		const values = [];
@@ -195,7 +195,7 @@ function handleArray(parameters: ArrayParameters): unknown {
 
 		emit(state, prefix, properties, values);
 
-		return result as unknown;
+		return result;
 	}
 
 	switch (callback) {
@@ -233,7 +233,7 @@ function handleArray(parameters: ArrayParameters): unknown {
  * Is the value a reactive store?
  */
 export function isStore(value: unknown): boolean {
-	return value?.[stateKey] instanceof State;
+	return (value as Record<string, unknown>)?.[stateKey] instanceof State;
 }
 
 /**
