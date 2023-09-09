@@ -2,31 +2,27 @@
  * Observes changes for properties used in a function
  */
 export declare function observe(
-	callback: () => unknown,
-	after: (value: unknown) => unknown,
-): unknown;
+	callback: () => any,
+	after?: (value: any) => any,
+): any;
 
 export type Key = string | number | symbol;
 
 export type Data = {
-	[index: number]: unknown;
-	[key: string]: unknown;
+	[index: number]: any;
+	[key: string]: any;
 };
 
 export type Store<T extends Data> = {
 	[K in keyof T]: T[K] extends Data ? Store<T[K]> : T[K];
 } & Data;
 
-type Subscriber = (
-	newValue: unknown,
-	oldValue?: unknown,
-	origin?: string,
-) => void;
+type Subscriber = (newValue: any, oldValue?: any, origin?: string) => void;
 
 /**
  * Is the value a reactive store?
  */
-export declare function isStore(value: unknown): boolean;
+export declare function isStore(value: any): boolean;
 
 /**
  * Creates a reactive store
@@ -52,7 +48,7 @@ export declare function unsubscribe<T extends Data>(
 ): void;
 
 export declare class Template {
-	constructor(strings: TemplateStringsArray, expressions: unknown[]);
+	constructor(strings: TemplateStringsArray, expressions: any[]);
 	render(parent?: Element): Node;
 }
 
@@ -61,5 +57,5 @@ export declare class Template {
  */
 export declare function template(
 	strings: TemplateStringsArray,
-	...expressions: unknown[]
+	...expressions: any[]
 ): Template;
