@@ -5,7 +5,7 @@ export type TemplateExpressionValue = Expression | Node | Template;
 
 export type TemplateExpressions = {
 	index: number;
-	original: unknown[];
+	original: any[];
 	values: TemplateExpressionValue[];
 };
 
@@ -24,11 +24,11 @@ export class Expression {
 		return this.callback;
 	}
 
-	constructor(private readonly callback: (...args: unknown[]) => unknown) {}
+	constructor(private readonly callback: (...args: any[]) => any) {}
 }
 
 export class Template {
-	constructor(strings: TemplateStringsArray, expressions: unknown[]) {
+	constructor(strings: TemplateStringsArray, expressions: any[]) {
 		data.set(this, {
 			strings,
 			expressions: {
@@ -53,17 +53,14 @@ export class Template {
 /**
  * Renders a template
  */
-export function template(
-	strings: TemplateStringsArray,
-	...expressions: unknown[]
-) {
+export function template(strings: TemplateStringsArray, ...expressions: any[]) {
 	return new Template(strings, expressions);
 }
 
 function toString(template: Template): string {
 	const {strings, expressions} = data.get(template)!;
 
-	function express(value: string, expression: unknown): string {
+	function express(value: string, expression: any): string {
 		const isFunction = typeof expression === 'function';
 
 		if (
@@ -72,7 +69,9 @@ function toString(template: Template): string {
 			expression instanceof Template
 		) {
 			expressions.values.push(
-				isFunction ? new Expression(expression as never) : expression,
+				(isFunction
+					? new Expression(expression as never)
+					: expression) as never,
 			);
 
 			return value + comment;
@@ -96,7 +95,7 @@ function toString(template: Template): string {
 	// eslint-disable-next-line unicorn/no-for-loop
 	for (let index = 0; index < strings.length; index += 1) {
 		const value = strings[index];
-		const expression = expressions.original[index];
+		const expression = expressions.original[index] as unknown;
 
 		html += expression === undefined ? value : express(value, expression);
 	}

@@ -11,7 +11,7 @@ import {
 import {handleEvent} from './events';
 import {getString} from './index';
 
-export function createNode(value: unknown): Node {
+export function createNode(value: any): Node {
 	if (value instanceof Node) {
 		return value;
 	}

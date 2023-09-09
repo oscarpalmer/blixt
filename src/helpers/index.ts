@@ -10,11 +10,11 @@ export function getKey(...parts: Array<Key | undefined>): string {
 		.join(period);
 }
 
-export function getString(value: unknown): string {
+export function getString(value: any): string {
 	return typeof value === 'string' ? value : String(value);
 }
 
-export function getValue(data: unknown, key: string): unknown {
+export function getValue(data: any, key: string): any {
 	if (typeof data !== 'object') {
 		return data;
 	}
@@ -24,7 +24,7 @@ export function getValue(data: unknown, key: string): unknown {
 	let value: unknown = data;
 
 	for (const part of parts) {
-		value = (value as Record<string, unknown>)?.[part];
+		value = (value as Record<string, any>)?.[part];
 	}
 
 	return value;

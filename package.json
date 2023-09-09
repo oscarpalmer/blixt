@@ -7,10 +7,10 @@
 	"description": "⚡️",
 	"devDependencies": {
 		"@happy-dom/global-registrator": "^11.0",
-		"@ava/typescript": "^4.1",
+		"@rollup/plugin-typescript": "^11.1",
 		"bun": "^1.0",
-		"esbuild": "^0.19",
 		"prettier": "^3.0",
+		"rollup": "^3.29",
 		"typescript": "^5.2",
 		"xo": "^0.56"
 	},
@@ -41,12 +41,12 @@
 		"url": "git+https://github.com/oscarpalmer/blixt.git"
 	},
 	"scripts": {
-		"build": "npm run build:esm; npm run build:iife; npm run types",
-		"build:esm": "esbuild ./src/index.ts --bundle --format=esm --outfile=./dist/blixt.js --target=es2020",
-		"build:iife": "esbuild ./src/index.ts --bundle --format=iife --global-name=Blixt --outfile=./dist/blixt.iife.js --target=es2020",
+		"build": "npm run build:esm && npm run build:iife",
+		"build:esm": "rollup -c",
+		"build:iife": "rollup -c --environment ROLLUP_FORMAT:iife",
 		"test": "bun test --coverage --preload ./test/preload.ts",
 		"types": "tsc ./src/index.ts --declaration --declarationDir ./types --emitDeclarationOnly",
-		"watch": "esbuild ./src/index.ts --bundle --watch --format=esm --main-fields=module,main --outfile=dist/blixt.js --platform=neutral --target=esnext",
+		"watch": "rollup -c -w",
 		"xo": "xo ./src/*.ts ./src/**/*.ts --env browser"
 	},
 	"type": "module",
@@ -60,8 +60,7 @@
 		"prettier": true,
 		"rules": {
 			"import/extensions": "off",
-			"import/no-cycle": "off",
-			"no-use-extend-native/no-use-extend-native": "off"
+			"import/no-cycle": "off"
 		}
 	}
 }

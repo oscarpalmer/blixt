@@ -33,10 +33,10 @@ export function observeAttribute(
 		element.removeAttribute(name);
 	}
 
-	observe(expression.value, (value: unknown) => {
+	observe(expression.value, (value: any) => {
 		if (isBoolean) {
 			if (typeof value === 'boolean') {
-				(element as unknown as Record<string, unknown>)[name] = value;
+				(element as Record<string, any>)[name] = value;
 			}
 
 			return;
@@ -91,7 +91,7 @@ export function observeContent(comment: Comment, expression: Expression): void {
 	let current: Node[][] | undefined;
 	let isText = false;
 
-	observe(expression.value, (value: unknown) => {
+	observe(expression.value, (value: any) => {
 		const isArray = Array.isArray(value);
 
 		if (value === undefined || value === null || isArray) {
@@ -125,11 +125,11 @@ export function observeContent(comment: Comment, expression: Expression): void {
 
 /**
  * Observes changes for properties used in a function
+ * @param {() => any} callback
+ * @param {{(value: any) => any}=} after
+ * @returns {any}
  */
-export function observe(
-	callback: () => unknown,
-	after: (value: unknown) => unknown,
-): unknown {
+export function observe(callback: () => any, after?: (value: any) => any): any {
 	const hasAfter = typeof after === 'function';
 	const id = Symbol(undefined);
 
@@ -147,7 +147,7 @@ export function observe(
 
 	let frame: number | undefined;
 
-	function run(): unknown {
+	function run(): any {
 		observers.set(id, new Map());
 
 		const value = callback() as never;
@@ -209,7 +209,7 @@ export function observeKey(state: State, key: Key): void {
 export function updateArray(
 	comment: Comment,
 	current: Node[][] | undefined,
-	array: unknown[],
+	array: any[],
 ): Node[][] {
 	return replaceNodes(
 		current ?? [[comment]],

@@ -2,24 +2,20 @@ import {type Key, getKey, getString, getValue} from './helpers';
 import {observeKey} from './observer';
 
 type ArrayParameters = {
-	array: unknown[];
+	array: any[];
 	callback: string;
 	state: State;
 	prefix: string;
-	value: unknown;
+	value: any;
 };
 
-export type Data = {[index: number]: unknown; [key: string]: unknown};
+export type Data = {[index: number]: any; [key: string]: any};
 
 export type Store<T extends Data> = {
 	[K in keyof T]: T[K] extends Data ? Store<T[K]> : T[K];
 } & Data;
 
-type Subscriber = (
-	newValue: unknown,
-	oldValue?: unknown,
-	origin?: string,
-) => void;
+type Subscriber = (newValue: any, oldValue?: any, origin?: string) => void;
 
 export const proxies = new WeakMap<State, ProxyConstructor>();
 
@@ -58,7 +54,7 @@ function createStore<T extends Data>(
 			if (isArray && property in Array.prototype) {
 				return handleArray({
 					value,
-					array: proxyValue as unknown[],
+					array: proxyValue as any[],
 					callback: getString(property),
 					prefix: prefix ?? '',
 					state: proxyState,
@@ -72,7 +68,14 @@ function createStore<T extends Data>(
 		},
 		set(target, property, value) {
 			const oldValue = Reflect.get(target, property) as unknown;
-			const newValue = transformItem(proxyState, prefix, property, value);
+
+			const newValue = transformItem(
+				proxyState,
+				prefix,
+				property,
+				value,
+			) as unknown;
+
 			const setValue = Reflect.set(target, property, newValue);
 
 			if (setValue) {
@@ -131,7 +134,7 @@ function emit(
 	state: State,
 	prefix: string | undefined,
 	properties: Key[],
-	values: unknown[],
+	values: any[],
 ): void {
 	const proxy = proxies.get(state);
 
@@ -144,7 +147,7 @@ function emit(
 
 		keys.push(
 			...parts
-				.map((_: unknown, index: number) => parts.slice(0, index + 1).join('.'))
+				.map((_: any, index: number) => parts.slice(0, index + 1).join('.'))
 				.reverse(),
 		);
 	}
@@ -160,8 +163,8 @@ function emit(
 
 		const emitOrigin = key === origin ? undefined : origin;
 
-		const newValue = getValue(proxy, key);
-		const oldValue = values[keys.indexOf(key)] ?? undefined;
+		const newValue = getValue(proxy, key) as unknown;
+		const oldValue = (values[keys.indexOf(key)] ?? undefined) as unknown;
 
 		for (const callback of callbacks) {
 			callback(newValue, oldValue, emitOrigin);
@@ -172,10 +175,10 @@ function emit(
 function handleArray(parameters: ArrayParameters): unknown {
 	const {array, callback, state, prefix} = parameters;
 
-	function synthetic(...args: unknown[]) {
+	function synthetic(...args: any[]) {
 		const oldArray = array.slice(0);
 
-		const result: unknown = Array.prototype[callback].call(array, ...args);
+		const result = Array.prototype[callback].call(array, ...args) as unknown;
 
 		const properties = [];
 		const values = [];
@@ -210,12 +213,12 @@ function handleArray(parameters: ArrayParameters): unknown {
 		case 'fill':
 		case 'push':
 		case 'unshift': {
-			return (...items: unknown[]) =>
+			return (...items: any[]) =>
 				synthetic(...(transformData(state, prefix, items, true) as unknown[]));
 		}
 
 		case 'splice': {
-			return (start: number, remove: number, ...items: unknown[]) =>
+			return (start: number, remove: number, ...items: any[]) =>
 				synthetic(
 					start,
 					remove,
@@ -232,12 +235,15 @@ function handleArray(parameters: ArrayParameters): unknown {
 /**
  * Is the value a reactive store?
  */
-export function isStore(value: unknown): boolean {
-	return (value as Record<string, unknown>)?.[stateKey] instanceof State;
+export function isStore(value: any): boolean {
+	return (value as Record<string, any>)?.[stateKey] instanceof State;
 }
 
 /**
  * Creates a reactive store
+ * @template {Data} T
+ * @param {T} data
+ * @returns {Store<T>}
  */
 export function store<T extends Data>(data: T): Store<T> {
 	if (typeof data !== 'object') {
@@ -249,6 +255,11 @@ export function store<T extends Data>(data: T): Store<T> {
 
 /**
  * Subscribes to value changes for a key in a store
+ * @template {Data} T
+ * @param {Store<T>} store
+ * @param {number|string|symbol} key
+ * @param {(newValue: any, oldValue?: any, origin?: string) => void} callback
+ * @returns {void}
  */
 export function subscribe<T extends Data>(
 	store: Store<T>,
@@ -261,7 +272,7 @@ export function subscribe<T extends Data>(
 		return;
 	}
 
-	const keyAsString = String(key);
+	const keyAsString = getString(key);
 	const subscribers = stored.get(keyAsString);
 
 	if (subscribers === undefined) {
@@ -274,12 +285,12 @@ export function subscribe<T extends Data>(
 function transformData(
 	state: State,
 	prefix: Key | undefined,
-	data: unknown[] | Record<string, unknown>,
+	data: any[] | Record<string, any>,
 	isArray: boolean,
-): unknown[] | Record<string, unknown> {
+): any[] | Record<string, any> {
 	const value = (isArray ? [] : Object.create(data, {})) as Record<
 		number | string,
-		unknown
+		any
 	>;
 
 	for (const key in data) {
@@ -288,8 +299,8 @@ function transformData(
 				state,
 				prefix,
 				key,
-				(data as Record<string, unknown>)[key],
-			);
+				(data as Record<string, any>)[key],
+			) as unknown;
 		}
 	}
 
@@ -300,8 +311,8 @@ function transformItem(
 	state: State,
 	prefix: Key | undefined,
 	key: Key,
-	value: unknown,
-): unknown {
+	value: any,
+): any {
 	if (value === undefined || value === null) {
 		return value;
 	}
@@ -313,6 +324,11 @@ function transformItem(
 
 /**
  * Unsubscribes from value changes for a key in a store
+ * @template {Data} T
+ * @param {Store<T>} store
+ * @param {number|string|symbol} key
+ * @param {(newValue: any, oldValue?: any, origin?: string) => void} callback
+ * @returns {void}
  */
 export function unsubscribe<T extends Data>(
 	store: Store<T>,
