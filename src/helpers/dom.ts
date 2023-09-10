@@ -82,9 +82,7 @@ export function mapNodes(
 	template: Template,
 	node: Node,
 ): Node {
-	const templateData = data.get(template)!;
-
-	const {expressions} = templateData;
+	const {expressions} = data.get(template)!;
 
 	const children = Array.from(node.childNodes);
 

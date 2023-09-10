@@ -383,8 +383,7 @@ var Blixt = (function (exports) {
 		}
 	}
 	function mapNodes(data, template, node) {
-		const templateData = data.get(template);
-		const {expressions} = templateData;
+		const {expressions} = data.get(template);
 		const children = Array.from(node.childNodes);
 		for (const child of children) {
 			if (child.nodeType === 8 && child.nodeValue === blixt) {
@@ -434,83 +433,6 @@ var Blixt = (function (exports) {
 		'selected',
 	]);
 	const observers = new Map();
-	function observeAttribute(element, attribute, expression) {
-		const {name} = attribute;
-		const isBoolean = attributes.has(name);
-		const isClass = /^class\./i.test(name);
-		const isStyle = /^style\./i.test(name);
-		if (isBoolean || isClass || isStyle) {
-			element.removeAttribute(name);
-		}
-		observe(expression.value, value => {
-			if (isBoolean) {
-				if (typeof value === 'boolean') {
-					element[name] = value;
-				}
-				return;
-			}
-			if (isClass) {
-				const classes = name.split('.').slice(1);
-				if (value === true) {
-					element.classList.add(...classes);
-				} else {
-					element.classList.remove(...classes);
-				}
-				return;
-			}
-			const remove = value === undefined || value === null;
-			if (isStyle) {
-				const [, property, suffix] = name.split('.');
-				if (
-					remove ||
-					value === false ||
-					(value === true && suffix === undefined)
-				) {
-					element.style.removeProperty(property);
-				} else {
-					element.style.setProperty(
-						property,
-						value === true ? suffix : `${getString(value)}${suffix ?? ''}`,
-					);
-				}
-				return;
-			}
-			if (name === 'value') {
-				element.value = getString(value);
-			}
-			if (remove) {
-				element.removeAttribute(name);
-			} else {
-				element.setAttribute(name, getString(value));
-			}
-		});
-	}
-	function observeContent(comment, expression) {
-		let current;
-		let isText = false;
-		observe(expression.value, value => {
-			const isArray = Array.isArray(value);
-			if (value === undefined || value === null || isArray) {
-				isText = false;
-				current =
-					isArray && value.length > 0
-						? updateArray(comment, current, value)
-						: current === undefined
-						? undefined
-						: replaceNodes(current, [[comment]], false);
-				return;
-			}
-			const node = createNode(value);
-			if (current !== undefined && isText && node instanceof Text) {
-				if (current[0][0].textContent !== node.textContent) {
-					current[0][0].textContent = node.textContent;
-				}
-				return;
-			}
-			isText = node instanceof Text;
-			current = replaceNodes(current ?? [[comment]], getNodes(node), true);
-		});
-	}
 	/**
 	 * Observes changes for properties used in a function
 	 * @param {() => any} callback
@@ -555,11 +477,76 @@ var Blixt = (function (exports) {
 		}
 		return run();
 	}
-	function observeKey(state, key) {
-		const proxy = proxies.get(state);
-		if (proxy === undefined) {
+	function observeAttribute(element, attribute, expression) {
+		const {name} = attribute;
+		const isBoolean = attributes.has(name);
+		const isClass = /^class\./i.test(name);
+		const isStyle = /^style\./i.test(name);
+		if (isBoolean || isClass || isStyle) {
+			element.removeAttribute(name);
+		}
+		if (isBoolean) {
+			observeBooleanAttribute(element, name, expression);
+		} else if (isClass) {
+			observeClassAttribute(element, name, expression);
+		} else if (isStyle) {
+			observeStyleAttribute(element, name, expression);
+		} else {
+			observeValueAttribute(element, name, expression);
+		}
+	}
+	function observeBooleanAttribute(element, name, expression) {
+		observe(expression.value, value => {
+			if (typeof value === 'boolean') {
+				element[name] = value;
+			}
+		});
+	}
+	function observeClassAttribute(element, name, expression) {
+		const classes = name
+			.split('.')
+			.slice(1)
+			.map(name => name.trim())
+			.filter(name => name.length > 0);
+		if (classes.length === 0) {
 			return;
 		}
+		observe(expression.value, value => {
+			if (value === true) {
+				element.classList.add(...classes);
+			} else {
+				element.classList.remove(...classes);
+			}
+		});
+	}
+	function observeContent(comment, expression) {
+		let current;
+		let isText = false;
+		observe(expression.value, value => {
+			const isArray = Array.isArray(value);
+			if (value === undefined || value === null || isArray) {
+				isText = false;
+				current =
+					isArray && value.length > 0
+						? updateArray(comment, current, value)
+						: current === undefined
+						? undefined
+						: replaceNodes(current, [[comment]], false);
+				return;
+			}
+			const node = createNode(value);
+			if (current !== undefined && isText && node instanceof Text) {
+				if (current[0][0].textContent !== node.textContent) {
+					current[0][0].textContent = node.textContent;
+				}
+				return;
+			}
+			isText = node instanceof Text;
+			current = replaceNodes(current ?? [[comment]], getNodes(node), true);
+		});
+	}
+	function observeKey(state, key) {
+		const proxy = proxies.get(state);
 		const values = Array.from(observers.values());
 		for (const map of values) {
 			const keys = map.get(proxy);
@@ -569,6 +556,44 @@ var Blixt = (function (exports) {
 				keys.add(key);
 			}
 		}
+	}
+	function observeStyleAttribute(element, name, expression) {
+		const [, first, second] = name.split('.');
+		const property = first.trim();
+		const suffix = second?.trim();
+		if (
+			property.length === 0 ||
+			(suffix !== undefined && suffix.length === 0)
+		) {
+			return;
+		}
+		observe(expression.value, value => {
+			if (
+				value === undefined ||
+				value === null ||
+				value === false ||
+				(value === true && suffix === undefined)
+			) {
+				element.style.removeProperty(property);
+			} else {
+				element.style.setProperty(
+					property,
+					value === true ? suffix : `${value}${suffix ?? ''}`,
+				);
+			}
+		});
+	}
+	function observeValueAttribute(element, name, expression) {
+		observe(expression.value, value => {
+			if (name === 'value') {
+				element.value = value;
+			}
+			if (value === undefined || value === null) {
+				element.removeAttribute(name);
+			} else {
+				element.setAttribute(name, value);
+			}
+		});
 	}
 	function updateArray(comment, current, array) {
 		return replaceNodes(

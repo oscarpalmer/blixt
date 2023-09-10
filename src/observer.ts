@@ -18,111 +18,6 @@ const attributes = new Set([
 
 const observers = new Map<symbol, Map<Store<Data>, Set<Key>>>();
 
-export function observeAttribute(
-	element: HTMLElement,
-	attribute: Attr,
-	expression: Expression,
-): void {
-	const {name} = attribute;
-
-	const isBoolean = attributes.has(name);
-	const isClass = /^class\./i.test(name);
-	const isStyle = /^style\./i.test(name);
-
-	if (isBoolean || isClass || isStyle) {
-		element.removeAttribute(name);
-	}
-
-	observe(expression.value, (value: any) => {
-		if (isBoolean) {
-			if (typeof value === 'boolean') {
-				(element as Record<string, any>)[name] = value;
-			}
-
-			return;
-		}
-
-		if (isClass) {
-			const classes = name.split('.').slice(1);
-
-			if (value === true) {
-				element.classList.add(...classes);
-			} else {
-				element.classList.remove(...classes);
-			}
-
-			return;
-		}
-
-		const remove = value === undefined || value === null;
-
-		if (isStyle) {
-			const [, property, suffix] = name.split('.');
-
-			if (
-				remove ||
-				value === false ||
-				(value === true && suffix === undefined)
-			) {
-				element.style.removeProperty(property);
-			} else {
-				element.style.setProperty(
-					property,
-					value === true ? suffix : `${getString(value)}${suffix ?? ''}`,
-				);
-			}
-
-			return;
-		}
-
-		if (name === 'value') {
-			(element as HTMLInputElement).value = getString(value);
-		}
-
-		if (remove) {
-			element.removeAttribute(name);
-		} else {
-			element.setAttribute(name, getString(value));
-		}
-	});
-}
-
-export function observeContent(comment: Comment, expression: Expression): void {
-	let current: Node[][] | undefined;
-	let isText = false;
-
-	observe(expression.value, (value: any) => {
-		const isArray = Array.isArray(value);
-
-		if (value === undefined || value === null || isArray) {
-			isText = false;
-
-			current =
-				isArray && value.length > 0
-					? updateArray(comment, current, value)
-					: current === undefined
-					? undefined
-					: replaceNodes(current, [[comment]], false)!;
-
-			return;
-		}
-
-		const node = createNode(value);
-
-		if (current !== undefined && isText && node instanceof Text) {
-			if (current[0][0].textContent !== node.textContent) {
-				current[0][0].textContent = node.textContent;
-			}
-
-			return;
-		}
-
-		isText = node instanceof Text;
-
-		current = replaceNodes(current ?? [[comment]], getNodes(node), true);
-	});
-}
-
 /**
  * Observes changes for properties used in a function
  * @param {() => any} callback
@@ -186,13 +81,106 @@ export function observe(callback: () => any, after?: (value: any) => any): any {
 	return run();
 }
 
-export function observeKey(state: State, key: Key): void {
-	const proxy = proxies.get(state);
+export function observeAttribute(
+	element: HTMLElement,
+	attribute: Attr,
+	expression: Expression,
+): void {
+	const {name} = attribute;
 
-	if (proxy === undefined) {
+	const isBoolean = attributes.has(name);
+	const isClass = /^class\./i.test(name);
+	const isStyle = /^style\./i.test(name);
+
+	if (isBoolean || isClass || isStyle) {
+		element.removeAttribute(name);
+	}
+
+	if (isBoolean) {
+		observeBooleanAttribute(element, name, expression);
+	} else if (isClass) {
+		observeClassAttribute(element, name, expression);
+	} else if (isStyle) {
+		observeStyleAttribute(element, name, expression);
+	} else {
+		observeValueAttribute(element, name, expression);
+	}
+}
+
+function observeBooleanAttribute(
+	element: HTMLElement,
+	name: string,
+	expression: Expression,
+): void {
+	observe(expression.value, (value: any) => {
+		if (typeof value === 'boolean') {
+			(element as Record<string, any>)[name] = value;
+		}
+	});
+}
+
+function observeClassAttribute(
+	element: HTMLElement,
+	name: string,
+	expression: Expression,
+): void {
+	const classes = name
+		.split('.')
+		.slice(1)
+		.map(name => name.trim())
+		.filter(name => name.length > 0);
+
+	if (classes.length === 0) {
 		return;
 	}
 
+	observe(expression.value, (value: any) => {
+		if (value === true) {
+			element.classList.add(...classes);
+		} else {
+			element.classList.remove(...classes);
+		}
+	});
+}
+
+export function observeContent(comment: Comment, expression: Expression): void {
+	let current: Node[][] | undefined;
+	let isText = false;
+
+	observe(expression.value, (value: any) => {
+		const isArray = Array.isArray(value);
+
+		if (value === undefined || value === null || isArray) {
+			isText = false;
+
+			current =
+				isArray && value.length > 0
+					? updateArray(comment, current, value)
+					: current === undefined
+					? undefined
+					: replaceNodes(current, [[comment]], false)!;
+
+			return;
+		}
+
+		const node = createNode(value);
+
+		if (current !== undefined && isText && node instanceof Text) {
+			if (current[0][0].textContent !== node.textContent) {
+				current[0][0].textContent = node.textContent;
+			}
+
+			return;
+		}
+
+		isText = node instanceof Text;
+
+		current = replaceNodes(current ?? [[comment]], getNodes(node), true);
+	});
+}
+
+export function observeKey(state: State, key: Key): void {
+	const proxy = proxies.get(state)!;
 	const values = Array.from(observers.values());
 
 	for (const map of values) {
@@ -204,6 +192,55 @@ export function observeKey(state: State, key: Key): void {
 			keys.add(key);
 		}
 	}
+}
+
+function observeStyleAttribute(
+	element: HTMLElement,
+	name: string,
+	expression: Expression,
+): void {
+	const [, first, second] = name.split('.');
+
+	const property = first.trim();
+	const suffix = second?.trim();
+
+	if (property.length === 0 || (suffix !== undefined && suffix.length === 0)) {
+		return;
+	}
+
+	observe(expression.value, (value: any) => {
+		if (
+			value === undefined ||
+			value === null ||
+			value === false ||
+			(value === true && suffix === undefined)
+		) {
+			element.style.removeProperty(property);
+		} else {
+			element.style.setProperty(
+				property,
+				value === true ? suffix : `${value}${suffix ?? ''}`,
+			);
+		}
+	});
+}
+
+function observeValueAttribute(
+	element: HTMLElement,
+	name: string,
+	expression: Expression,
+): void {
+	observe(expression.value, (value: any) => {
+		if (name === 'value') {
+			(element as HTMLInputElement).value = value as never;
+		}
+
+		if (value === undefined || value === null) {
+			element.removeAttribute(name);
+		} else {
+			element.setAttribute(name, value as never);
+		}
+	});
 }
 
 export function updateArray(

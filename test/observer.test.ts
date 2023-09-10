@@ -41,8 +41,10 @@ test('observeAttributes', () => {
 	value="${() => stored.content}"
 	data-foo="${() => (stored.boolean ? 'bar' : null)}"
 	class.a.b.c="${() => stored.boolean}"
+	class...="${() => stored.boolean}"
 	style.color.red="${() => stored.boolean}"
 	style.font-size="${() => (stored.boolean ? '2em' : null)}"
+	style...="${() => stored.boolean}"
 	@click="${() => {
 		stored.boolean = !stored.boolean;
 	}}"
