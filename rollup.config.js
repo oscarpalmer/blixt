@@ -1,5 +1,6 @@
 import typescript from '@rollup/plugin-typescript';
 
+// eslint-disable-next-line n/prefer-global/process
 const format = process?.env?.ROLLUP_FORMAT ?? 'es';
 const isEsm = format === 'es';
 

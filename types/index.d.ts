@@ -48,12 +48,23 @@ export declare function unsubscribe<T extends Data>(
 ): void;
 
 export declare class Template {
+	/**
+	 * Creates a template
+	 * @param {TemplateStringsArray} strings
+	 * @param {...any} expressions
+	 */
 	constructor(strings: TemplateStringsArray, expressions: any[]);
+
+	/**
+	 * Renders a template, on its own or for a parent
+	 * @param {ParentNode=} parent
+	 * @returns {Node}
+	 */
 	render(parent?: Element): Node;
 }
 
 /**
- * Renders a template
+ * Creates a template
  */
 export declare function template(
 	strings: TemplateStringsArray,

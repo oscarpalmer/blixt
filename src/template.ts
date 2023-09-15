@@ -28,6 +28,11 @@ export class Expression {
 }
 
 export class Template {
+	/**
+	 * Creates a template
+	 * @param {TemplateStringsArray} strings
+	 * @param {...any} expressions
+	 */
 	constructor(strings: TemplateStringsArray, expressions: any[]) {
 		data.set(this, {
 			strings,
@@ -39,7 +44,12 @@ export class Template {
 		});
 	}
 
-	render(parent?: Element): Node {
+	/**
+	 * Renders a template, on its own or for a parent
+	 * @param {ParentNode=} parent
+	 * @returns {Node}
+	 */
+	render(parent?: ParentNode): Node {
 		const value = toString(this);
 		const rendered = createNodes(value);
 		const mapped = mapNodes(data, this, rendered);
@@ -51,7 +61,7 @@ export class Template {
 }
 
 /**
- * Renders a template
+ * Creates a template
  */
 export function template(strings: TemplateStringsArray, ...expressions: any[]) {
 	return new Template(strings, expressions);

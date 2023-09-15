@@ -23,7 +23,7 @@ export function createNode(value: any): Node {
 	return document.createTextNode(getString(value));
 }
 
-export function createNodes(html: string): Node {
+export function createNodes(html: string): DocumentFragment {
 	const element = document.createElement('template');
 
 	element.innerHTML = html;
@@ -32,10 +32,10 @@ export function createNodes(html: string): Node {
 
 	fragment.normalize();
 
-	return fragment;
+	return fragment as DocumentFragment;
 }
 
-export function getNodes(value: Node | Node[]): Node[][] {
+export function getNodes(value: Node | Node[]): ChildNode[][] {
 	if (value === undefined) {
 		return [];
 	}
@@ -43,10 +43,8 @@ export function getNodes(value: Node | Node[]): Node[][] {
 	const array = Array.isArray(value) ? value : [value];
 
 	return array.map(item =>
-		item instanceof DocumentFragment
-			? (Array.from(item.childNodes) as Node[])
-			: [item],
-	);
+		item instanceof DocumentFragment ? Array.from(item.childNodes) : [item],
+	) as ChildNode[][];
 }
 
 export function mapAttributes(
@@ -106,20 +104,18 @@ export function mapNodes(
 }
 
 export function replaceNodes(
-	from: Node[][],
-	to: Node[][],
+	from: ChildNode[][],
+	to: ChildNode[][],
 	set: boolean,
-): Node[][] | undefined {
+): ChildNode[][] | undefined {
 	const items = (from ?? []).flat();
 
 	for (const item of items) {
 		if (items.indexOf(item) === 0) {
-			for (const node of to.flat()) {
-				item.parentElement?.insertBefore(node, item);
-			}
+			item.before(...to.flat());
 		}
 
-		item.parentElement?.removeChild(item);
+		item.remove();
 	}
 
 	return set ? to : undefined;

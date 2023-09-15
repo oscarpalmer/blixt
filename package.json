@@ -6,7 +6,7 @@
 	"browser": "dist/blixt.iife.js",
 	"description": "⚡️",
 	"devDependencies": {
-		"@happy-dom/global-registrator": "^11.0",
+		"@happy-dom/global-registrator": "^11.2",
 		"@rollup/plugin-typescript": "^11.1",
 		"bun": "^1.0",
 		"prettier": "^3.0",
@@ -52,7 +52,7 @@
 	"type": "module",
 	"types": "src/index.d.ts",
 	"unpkg": "dist/blixt.iife.js",
-	"version": "0.20.0",
+	"version": "0.21.0",
 	"xo": {
 		"envs": [
 			"browser"

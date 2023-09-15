@@ -250,6 +250,11 @@ class Expression {
 	}
 }
 class Template {
+	/**
+	 * Creates a template
+	 * @param {TemplateStringsArray} strings
+	 * @param {...any} expressions
+	 */
 	constructor(strings, expressions) {
 		data.set(this, {
 			strings,
@@ -260,6 +265,11 @@ class Template {
 			},
 		});
 	}
+	/**
+	 * Renders a template, on its own or for a parent
+	 * @param {ParentNode=} parent
+	 * @returns {Node}
+	 */
 	render(parent) {
 		const value = toString(this);
 		const rendered = createNodes(value);
@@ -269,7 +279,7 @@ class Template {
 	}
 }
 /**
- * Renders a template
+ * Creates a template
  */
 function template(strings, ...expressions) {
 	return new Template(strings, expressions);
@@ -396,11 +406,9 @@ function replaceNodes(from, to, set) {
 	const items = (from ?? []).flat();
 	for (const item of items) {
 		if (items.indexOf(item) === 0) {
-			for (const node of to.flat()) {
-				item.parentElement?.insertBefore(node, item);
-			}
+			item.before(...to.flat());
 		}
-		item.parentElement?.removeChild(item);
+		item.remove();
 	}
 	return set ? to : undefined;
 }

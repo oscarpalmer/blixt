@@ -144,7 +144,7 @@ function observeClassAttribute(
 }
 
 export function observeContent(comment: Comment, expression: Expression): void {
-	let current: Node[][] | undefined;
+	let current: ChildNode[][] | undefined;
 	let isText = false;
 
 	observe(expression.value, (value: any) => {
@@ -245,9 +245,9 @@ function observeValueAttribute(
 
 export function updateArray(
 	comment: Comment,
-	current: Node[][] | undefined,
+	current: ChildNode[][] | undefined,
 	array: any[],
-): Node[][] {
+): ChildNode[][] {
 	return replaceNodes(
 		current ?? [[comment]],
 		getNodes(array.map(item => createNode(item))),
