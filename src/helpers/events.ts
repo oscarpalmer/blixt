@@ -1,11 +1,23 @@
 import {type Expression} from '../template';
 
-type EventData = {
+type EventParameters = {
 	name: string;
 	options: AddEventListenerOptions;
 };
 
-export function getData(attribute: string): EventData {
+export function addEvent(
+	element: HTMLElement | SVGElement,
+	attribute: Attr,
+	expression: Expression,
+) {
+	const {name, options} = getEventParameters(attribute.name);
+
+	element.addEventListener(name as never, expression.value as never, options);
+
+	element.removeAttribute(attribute.name);
+}
+
+export function getEventParameters(attribute: string): EventParameters {
 	let name = attribute.slice(1);
 
 	const options: AddEventListenerOptions = {
@@ -17,29 +29,15 @@ export function getData(attribute: string): EventData {
 
 		name = event;
 
-		options.capture = items.includes('capture');
-		options.once = items.includes('once');
-		options.passive = !items.includes('active');
+		const normalised = new Set(items.map(item => item.toLowerCase()));
+
+		options.capture = normalised.has('capture');
+		options.once = normalised.has('once');
+		options.passive = !normalised.has('active');
 	}
 
 	return {
 		name,
 		options,
 	};
-}
-
-export function handleEvent(
-	element: HTMLElement,
-	attribute: Attr,
-	expression: Expression,
-) {
-	const event = getData(attribute.name);
-
-	element.addEventListener(
-		event.name as never,
-		expression.value as never,
-		event.options,
-	);
-
-	element.removeAttribute(attribute.name);
 }

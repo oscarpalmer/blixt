@@ -1,12 +1,12 @@
 import {expect, test} from 'bun:test';
-import {getData, handleEvent} from '../../src/helpers/events';
+import {addEvent, getEventParameters} from '../../src/helpers/events';
 
-test('getData', () => {
-	const simple = getData('@click');
-	const active = getData('@click:active');
-	const capture = getData('@click:capture');
-	const once = getData('@click:once');
-	const all = getData('@click:active:capture:once');
+test('getEventParameters', () => {
+	const simple = getEventParameters('@click');
+	const active = getEventParameters('@click:active');
+	const capture = getEventParameters('@click:capture');
+	const once = getEventParameters('@click:once');
+	const all = getEventParameters('@click:active:capture:once');
 
 	for (const event of [simple, active, capture, once, all]) {
 		expect(event.name).toEqual('click');
@@ -42,7 +42,7 @@ test('handleEvent', () => {
 		},
 	};
 
-	handleEvent(element, attribute, expression);
+	addEvent(element, attribute, expression);
 
 	expect(element.getAttribute('@click')).toEqual(null);
 	expect(value).toEqual(0);

@@ -1,4 +1,11 @@
-import {type Key, getKey, getString, getValue} from './helpers';
+import {
+	type Key,
+	getKey,
+	getString,
+	getValue,
+	isKey,
+	isGenericObject,
+} from './helpers';
 import {observeKey} from './observer';
 
 type ArrayParameters = {
@@ -31,8 +38,8 @@ function createStore<T extends Data>(
 	state?: State,
 	prefix?: string,
 ): Store<T> {
-	if (isStore(data)) {
-		return data as Store<T>;
+	if (isStore(data) || !isGenericObject(data)) {
+		return data;
 	}
 
 	const isArray = Array.isArray(data);
@@ -266,11 +273,9 @@ export function subscribe<T extends Data>(
 	key: Key,
 	callback: Subscriber,
 ): void {
-	const stored = subscriptions.get(store?.[stateKey] as State);
+	validateSubscription(store, key, callback);
 
-	if (stored === undefined) {
-		return;
-	}
+	const stored = subscriptions.get(store?.[stateKey] as State)!;
 
 	const keyAsString = getString(key);
 	const subscribers = stored.get(keyAsString);
@@ -313,11 +318,7 @@ function transformItem(
 	key: Key,
 	value: any,
 ): any {
-	if (value === undefined || value === null) {
-		return value;
-	}
-
-	return typeof value === 'object'
+	return typeof value === 'object' && value !== null
 		? createStore(value as never, state, getKey(prefix, key))
 		: value;
 }
@@ -335,8 +336,28 @@ export function unsubscribe<T extends Data>(
 	key: Key,
 	callback: Subscriber,
 ): void {
+	validateSubscription(store, key, callback);
+
 	const stored = subscriptions.get(store?.[stateKey] as State);
 	const subscribers = stored?.get(String(key));
 
 	subscribers?.delete(callback);
+}
+
+function validateSubscription(
+	store: unknown,
+	key: unknown,
+	callback: unknown,
+): void {
+	if (!isStore(store)) {
+		throw new TypeError('Store must be a store');
+	}
+
+	if (!isKey(key)) {
+		throw new TypeError('Key must be a number, string, or symbol');
+	}
+
+	if (typeof callback !== 'function') {
+		throw new TypeError('Callback must be a function');
+	}
 }

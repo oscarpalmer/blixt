@@ -1,6 +1,11 @@
 import {expect, test} from 'bun:test';
 import {template, Template} from '../../src/template';
-import {createNode, getNodes, replaceNodes} from '../../src/helpers/dom';
+import {
+	createNode,
+	createNodes,
+	getNodes,
+	replaceNodes,
+} from '../../src/helpers/dom';
 
 test('createNode:text', () => {
 	const text = createNode('test');
@@ -26,6 +31,14 @@ test('createNode:template', () => {
 	const node = createNode(templated);
 
 	expect(node).toBeInstanceOf(DocumentFragment);
+});
+
+test('createNodes', () => {
+	const fragment = createNodes(
+		`<p>Hello, world</p><script>alert('test!')</script>`,
+	);
+
+	expect(fragment.querySelector('script')).toEqual(null);
 });
 
 test('getNodes', () => {

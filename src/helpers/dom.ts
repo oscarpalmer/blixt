@@ -8,7 +8,7 @@ import {
 	type TemplateExpressions,
 	type TemplateExpressionValue,
 } from '../template';
-import {handleEvent} from './events';
+import {addEvent} from './events';
 import {getString} from './index';
 
 export function createNode(value: any): Node {
@@ -30,21 +30,27 @@ export function createNodes(html: string): DocumentFragment {
 
 	const fragment = element.content.cloneNode(true);
 
+	const scripts = Array.from(
+		(fragment as HTMLElement).querySelectorAll('script'),
+	);
+
+	for (const script of scripts) {
+		script.remove();
+	}
+
 	fragment.normalize();
 
 	return fragment as DocumentFragment;
 }
 
 export function getNodes(value: Node | Node[]): ChildNode[][] {
-	if (value === undefined) {
-		return [];
-	}
-
 	const array = Array.isArray(value) ? value : [value];
 
-	return array.map(item =>
-		item instanceof DocumentFragment ? Array.from(item.childNodes) : [item],
-	) as ChildNode[][];
+	return array
+		.filter(item => item instanceof Node)
+		.map(item =>
+			item instanceof DocumentFragment ? Array.from(item.childNodes) : [item],
+		) as ChildNode[][];
 }
 
 export function mapAttributes(
@@ -54,21 +60,27 @@ export function mapAttributes(
 	const attributes = Array.from(element.attributes);
 
 	for (const attribute of attributes) {
-		if (attribute.value !== comment) {
-			continue;
-		}
+		const expression =
+			attribute.value === comment
+				? expressions.values[expressions.index++]
+				: undefined;
 
-		const expression = expressions.values[expressions.index++];
+		const isOnAttribute = attribute.name.toLowerCase().startsWith('on');
 
 		if (
+			isOnAttribute ||
 			!(expression instanceof Expression) ||
-			!(element instanceof HTMLElement)
+			!(element instanceof HTMLElement || element instanceof SVGElement)
 		) {
+			if (isOnAttribute) {
+				element.removeAttribute(attribute.name);
+			}
+
 			continue;
 		}
 
 		if (attribute.name.startsWith('@')) {
-			handleEvent(element, attribute, expression);
+			addEvent(element, attribute, expression);
 		} else {
 			observeAttribute(element, attribute, expression);
 		}
@@ -86,7 +98,7 @@ export function mapNodes(
 
 	for (const child of children) {
 		if (child.nodeType === 8 && child.nodeValue === blixt) {
-			setNode(child as CharacterData, expressions.values[expressions.index++]);
+			setNode(child as Comment, expressions.values[expressions.index++]);
 
 			continue;
 		}

@@ -87,6 +87,13 @@ test('subscribe', () => {
 	} catch (error) {
 		expect(error).toBeInstanceOf(TypeError);
 	}
+
+	try {
+		// @ts-expect-error Testing invalid input
+		subscribe(stored, [], null);
+	} catch (error) {
+		expect(error).toBeInstanceOf(TypeError);
+	}
 });
 
 test('unsubscribe', () => {

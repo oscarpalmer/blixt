@@ -1,4 +1,5 @@
 import {expect, test} from 'bun:test';
+import {observe} from '../src/observer';
 import {store} from '../src/store';
 import {template} from '../src/template';
 
@@ -8,6 +9,15 @@ const stored = store({
 	array: [1, 2, 3],
 	boolean: true,
 	content: 1,
+});
+
+test('observe', () => {
+	try {
+		// @ts-expect-error Testing invalid input
+		observe([]);
+	} catch (error) {
+		expect(error).toBeInstanceOf(TypeError);
+	}
 });
 
 test('observeArray', () => {

@@ -25,6 +25,14 @@ const observers = new Map<symbol, Map<Store<Data>, Set<Key>>>();
  * @returns {any}
  */
 export function observe(callback: () => any, after?: (value: any) => any): any {
+	if (typeof callback !== 'function') {
+		throw new TypeError('Callback must be a function');
+	}
+
+	if (after !== undefined && typeof after !== 'function') {
+		throw new TypeError('After-callback must be a function');
+	}
+
 	const hasAfter = typeof after === 'function';
 	const id = Symbol(undefined);
 
@@ -82,13 +90,13 @@ export function observe(callback: () => any, after?: (value: any) => any): any {
 }
 
 export function observeAttribute(
-	element: HTMLElement,
+	element: HTMLElement | SVGElement,
 	attribute: Attr,
 	expression: Expression,
 ): void {
 	const {name} = attribute;
 
-	const isBoolean = attributes.has(name);
+	const isBoolean = attributes.has(name.toLowerCase());
 	const isClass = /^class\./i.test(name);
 	const isStyle = /^style\./i.test(name);
 
@@ -108,7 +116,7 @@ export function observeAttribute(
 }
 
 function observeBooleanAttribute(
-	element: HTMLElement,
+	element: HTMLElement | SVGElement,
 	name: string,
 	expression: Expression,
 ): void {
@@ -120,7 +128,7 @@ function observeBooleanAttribute(
 }
 
 function observeClassAttribute(
-	element: HTMLElement,
+	element: HTMLElement | SVGElement,
 	name: string,
 	expression: Expression,
 ): void {
@@ -195,7 +203,7 @@ export function observeKey(state: State, key: Key): void {
 }
 
 function observeStyleAttribute(
-	element: HTMLElement,
+	element: HTMLElement | SVGElement,
 	name: string,
 	expression: Expression,
 ): void {
@@ -226,12 +234,12 @@ function observeStyleAttribute(
 }
 
 function observeValueAttribute(
-	element: HTMLElement,
+	element: HTMLElement | SVGElement,
 	name: string,
 	expression: Expression,
 ): void {
 	observe(expression.value, (value: any) => {
-		if (name === 'value') {
+		if (/^value$/i.test(name)) {
 			(element as HTMLInputElement).value = value as never;
 		}
 
