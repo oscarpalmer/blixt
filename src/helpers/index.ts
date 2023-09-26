@@ -1,4 +1,4 @@
-import {genericObjectTypes, keyTypes, period} from '../data';
+import {keyTypes, period} from '../data';
 import type {Key} from '../models';
 
 export function getKey(...parts: Array<Key | undefined>): string {
@@ -34,9 +34,7 @@ export function getValue(data: any, key: string): any {
 }
 
 export function isGenericObject(value: unknown): boolean {
-	return genericObjectTypes.has(
-		Object.prototype.toString.call(value).toLowerCase().slice(8, -1),
-	);
+	return Array.isArray(value) || value?.constructor?.name === 'Object';
 }
 
 export function isKey(value: unknown): boolean {

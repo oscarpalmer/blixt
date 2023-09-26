@@ -1,5 +1,6 @@
 import {expect, test} from 'bun:test';
 import {getKey, getValue, isGenericObject, isKey} from '../../src/helpers';
+import {template} from '../../src/template';
 
 test('getKey', () => {
 	expect(getKey('test', 'test')).toEqual('test.test');
@@ -22,6 +23,8 @@ test('isGenericObject', () => {
 	expect(isGenericObject(1)).toEqual(false);
 	expect(isGenericObject('')).toEqual(false);
 	expect(isGenericObject(new Date())).toEqual(false);
+	expect(isGenericObject(() => {})).toEqual(false);
+	expect(isGenericObject(template`<p>test</p>`)).toEqual(false);
 });
 
 test('isKey', () => {

@@ -19,8 +19,6 @@ export const classAttributeExpression = /^class\./i;
 
 export const comment = `<!--${blixt}-->`;
 
-export const genericObjectTypes = new Set(['array', 'object']);
-
 export const keyTypes = new Set<Key>(['number', 'string', 'symbol']);
 
 export const observers = new Map<symbol, Map<Store<Data>, Set<Key>>>();

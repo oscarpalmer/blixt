@@ -14,7 +14,6 @@ const booleanAttributes = new Set([
 ]);
 const classAttributeExpression = /^class\./i;
 const comment = `<!--${blixt}-->`;
-const genericObjectTypes = new Set(['array', 'object']);
 const keyTypes = new Set(['number', 'string', 'symbol']);
 const observers = new Map();
 const period = '.';
@@ -49,9 +48,7 @@ function getValue(data, key) {
 	return value;
 }
 function isGenericObject(value) {
-	return genericObjectTypes.has(
-		Object.prototype.toString.call(value).toLowerCase().slice(8, -1),
-	);
+	return Array.isArray(value) || value?.constructor?.name === 'Object';
 }
 function isKey(value) {
 	return keyTypes.has(typeof value);
