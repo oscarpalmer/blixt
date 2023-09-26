@@ -1,5 +1,6 @@
 import {expect, test} from 'bun:test';
-import {store, subscribe, unsubscribe} from '../src/store';
+import {store} from '../src/store';
+import {subscribe, unsubscribe} from '../src/store/subscription';
 
 const key = 'nested.key';
 

@@ -1,23 +1,6 @@
+import {comment, templateData} from './data';
 import {getString} from './helpers';
 import {createNodes, mapNodes} from './helpers/dom';
-
-export type TemplateExpressionValue = Expression | Node | Template;
-
-export type TemplateExpressions = {
-	index: number;
-	original: any[];
-	values: TemplateExpressionValue[];
-};
-
-export type TemplateData = {
-	expressions: TemplateExpressions;
-	strings: TemplateStringsArray;
-};
-
-export const blixt = 'blixt';
-export const comment = `<!--${blixt}-->`;
-
-const data = new WeakMap<Template, TemplateData>();
 
 export class Expression {
 	get value() {
@@ -34,7 +17,7 @@ export class Template {
 	 * @param {...any} expressions
 	 */
 	constructor(strings: TemplateStringsArray, expressions: any[]) {
-		data.set(this, {
+		templateData.set(this, {
 			strings,
 			expressions: {
 				index: 0,
@@ -52,7 +35,7 @@ export class Template {
 	render(parent?: ParentNode): Node {
 		const value = toString(this);
 		const rendered = createNodes(value);
-		const mapped = mapNodes(data, this, rendered);
+		const mapped = mapNodes(templateData, this, rendered);
 
 		parent?.append(mapped);
 
@@ -68,7 +51,7 @@ export function template(strings: TemplateStringsArray, ...expressions: any[]) {
 }
 
 function toString(template: Template): string {
-	const {strings, expressions} = data.get(template)!;
+	const {strings, expressions} = templateData.get(template)!;
 
 	function express(value: string, expression: any): string {
 		const isFunction = typeof expression === 'function';

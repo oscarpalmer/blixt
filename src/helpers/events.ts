@@ -1,9 +1,5 @@
-import {type Expression} from '../template';
-
-type EventParameters = {
-	name: string;
-	options: AddEventListenerOptions;
-};
+import type {EventParameters} from '../models';
+import type {Expression} from '../template';
 
 export function addEvent(
 	element: HTMLElement | SVGElement,

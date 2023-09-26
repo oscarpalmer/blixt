@@ -1,39 +1,10 @@
-import {
-	type Key,
-	getKey,
-	getString,
-	getValue,
-	isKey,
-	isGenericObject,
-} from './helpers';
-import {observeKey} from './observer';
+import {proxies, stateKey, subscriptions} from '../data';
+import {getKey, getString, getValue, isGenericObject} from '../helpers';
+import type {Data, HandleArrayParameters, Key, Store} from '../models';
+import {State} from '../models';
+import {observeKey} from '../observer';
 
-type ArrayParameters = {
-	array: any[];
-	callback: string;
-	state: State;
-	prefix: string;
-	value: any;
-};
-
-export type Data = {[index: number]: any; [key: string]: any};
-
-export type Store<T extends Data> = {
-	[K in keyof T]: T[K] extends Data ? Store<T[K]> : T[K];
-} & Data;
-
-type Subscriber = (newValue: any, oldValue?: any, origin?: string) => void;
-
-export const proxies = new WeakMap<State, ProxyConstructor>();
-
-const stateKey = '__state';
-
-const subscriptions = new WeakMap<State, Map<string, Set<Subscriber>>>();
-
-// eslint-disable-next-line @typescript-eslint/no-extraneous-class
-export class State {}
-
-function createStore<T extends Data>(
+export function createStore<T extends Data>(
 	data: T,
 	state?: State,
 	prefix?: string,
@@ -75,14 +46,7 @@ function createStore<T extends Data>(
 		},
 		set(target, property, value) {
 			const oldValue = Reflect.get(target, property) as unknown;
-
-			const newValue = transformItem(
-				proxyState,
-				prefix,
-				property,
-				value,
-			) as unknown;
-
+			const newValue = transformItem(proxyState, prefix, property, value);
 			const setValue = Reflect.set(target, property, newValue);
 
 			if (setValue) {
@@ -179,13 +143,17 @@ function emit(
 	}
 }
 
-function handleArray(parameters: ArrayParameters): unknown {
+function handleArray(parameters: HandleArrayParameters): unknown {
 	const {array, callback, state, prefix} = parameters;
 
 	function synthetic(...args: any[]) {
 		const oldArray = array.slice(0);
 
-		const result = Array.prototype[callback].call(array, ...args) as unknown;
+		// eslint-disable-next-line @typescript-eslint/no-unsafe-call
+		const result = Array.prototype[callback as never].apply(
+			array,
+			args,
+		) as unknown;
 
 		const properties = [];
 		const values = [];
@@ -260,42 +228,15 @@ export function store<T extends Data>(data: T): Store<T> {
 	return createStore(data);
 }
 
-/**
- * Subscribes to value changes for a key in a store
- * @template {Data} T
- * @param {Store<T>} store
- * @param {number|string|symbol} key
- * @param {(newValue: any, oldValue?: any, origin?: string) => void} callback
- * @returns {void}
- */
-export function subscribe<T extends Data>(
-	store: Store<T>,
-	key: Key,
-	callback: Subscriber,
-): void {
-	validateSubscription(store, key, callback);
-
-	const stored = subscriptions.get(store?.[stateKey] as State)!;
-
-	const keyAsString = getString(key);
-	const subscribers = stored.get(keyAsString);
-
-	if (subscribers === undefined) {
-		stored.set(keyAsString, new Set([callback]));
-	} else if (!subscribers.has(callback)) {
-		subscribers.add(callback);
-	}
-}
-
 function transformData(
 	state: State,
 	prefix: Key | undefined,
-	data: any[] | Record<string, any>,
+	data: unknown[] | Record<string, unknown>,
 	isArray: boolean,
-): any[] | Record<string, any> {
+): unknown[] | Record<string, unknown> {
 	const value = (isArray ? [] : Object.create(data, {})) as Record<
 		number | string,
-		any
+		unknown
 	>;
 
 	for (const key in data) {
@@ -304,8 +245,8 @@ function transformData(
 				state,
 				prefix,
 				key,
-				(data as Record<string, any>)[key],
-			) as unknown;
+				(data as Record<string, unknown>)[key],
+			);
 		}
 	}
 
@@ -316,48 +257,9 @@ function transformItem(
 	state: State,
 	prefix: Key | undefined,
 	key: Key,
-	value: any,
-): any {
+	value: unknown,
+): unknown {
 	return typeof value === 'object' && value !== null
 		? createStore(value as never, state, getKey(prefix, key))
 		: value;
-}
-
-/**
- * Unsubscribes from value changes for a key in a store
- * @template {Data} T
- * @param {Store<T>} store
- * @param {number|string|symbol} key
- * @param {(newValue: any, oldValue?: any, origin?: string) => void} callback
- * @returns {void}
- */
-export function unsubscribe<T extends Data>(
-	store: Store<T>,
-	key: Key,
-	callback: Subscriber,
-): void {
-	validateSubscription(store, key, callback);
-
-	const stored = subscriptions.get(store?.[stateKey] as State);
-	const subscribers = stored?.get(String(key));
-
-	subscribers?.delete(callback);
-}
-
-function validateSubscription(
-	store: unknown,
-	key: unknown,
-	callback: unknown,
-): void {
-	if (!isStore(store)) {
-		throw new TypeError('Store must be a store');
-	}
-
-	if (!isKey(key)) {
-		throw new TypeError('Key must be a number, string, or symbol');
-	}
-
-	if (typeof callback !== 'function') {
-		throw new TypeError('Callback must be a function');
-	}
 }

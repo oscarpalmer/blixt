@@ -25,6 +25,13 @@ const configuration = {
 	watch: {
 		include: 'src/**',
 	},
+	onLog(level, log, handler) {
+		if (log.code === 'CIRCULAR_DEPENDENCY') {
+			return;
+		}
+
+		handler(level, log);
+	},
 };
 
 export default configuration;

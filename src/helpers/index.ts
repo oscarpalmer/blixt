@@ -1,8 +1,5 @@
-export type Key = number | string | symbol;
-
-const genericObjectTypes = new Set(['array', 'object']);
-const keyTypes = new Set<Key>(['number', 'string', 'symbol']);
-const period = '.';
+import {genericObjectTypes, keyTypes, period} from '../data';
+import type {Key} from '../models';
 
 export function getKey(...parts: Array<Key | undefined>): string {
 	return parts

@@ -1,13 +1,12 @@
-import {observeAttribute, observeContent} from '../observer';
-import {
-	blixt,
-	comment,
-	Expression,
-	Template,
-	type TemplateData,
-	type TemplateExpressions,
-	type TemplateExpressionValue,
-} from '../template';
+import {blixt, comment} from '../data';
+import type {
+	TemplateData,
+	TemplateExpressionValue,
+	TemplateExpressions,
+} from '../models';
+import {observeAttribute} from '../observer/attribute';
+import {observeContent} from '../observer/content';
+import {Expression, Template} from '../template';
 import {addEvent} from './events';
 import {getString} from './index';
 

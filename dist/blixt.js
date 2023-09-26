@@ -1,6 +1,29 @@
 /** @typedef {{[index: number]: any; [key: string]: any}} Data */
 /** @typedef {{[K in keyof T]: T[K] extends Data ? Store<T[K]> : T[K]} & Data} Store<T> @template T */
+const blixt = 'blixt';
+const booleanAttributes = new Set([
+	'checked',
+	'disabled',
+	'hidden',
+	'inert',
+	'multiple',
+	'open',
+	'readonly',
+	'required',
+	'selected',
+]);
+const classAttributeExpression = /^class\./i;
+const comment = `<!--${blixt}-->`;
+const genericObjectTypes = new Set(['array', 'object']);
+const keyTypes = new Set(['number', 'string', 'symbol']);
+const observers = new Map();
 const period = '.';
+const proxies = new WeakMap();
+const stateKey = '__state';
+const styleAttributeExpression = /^style\./i;
+const subscriptions = new WeakMap();
+const templateData = new WeakMap();
+
 function getKey(...parts) {
 	return parts
 		.filter(part => part !== undefined)
@@ -18,18 +41,27 @@ function getValue(data, key) {
 	const parts = key.split(period);
 	let value = data;
 	for (const part of parts) {
+		if (value === undefined) {
+			return undefined;
+		}
 		value = value?.[part];
 	}
 	return value;
 }
+function isGenericObject(value) {
+	return genericObjectTypes.has(
+		Object.prototype.toString.call(value).toLowerCase().slice(8, -1),
+	);
+}
+function isKey(value) {
+	return keyTypes.has(typeof value);
+}
 
-const proxies = new WeakMap();
-const stateKey = '__state';
-const subscriptions = new WeakMap();
 // eslint-disable-next-line @typescript-eslint/no-extraneous-class
 class State {}
+
 function createStore(data, state, prefix) {
-	if (isStore(data)) {
+	if (isStore(data) || !isGenericObject(data)) {
 		return data;
 	}
 	const isArray = Array.isArray(data);
@@ -129,7 +161,8 @@ function handleArray(parameters) {
 	const {array, callback, state, prefix} = parameters;
 	function synthetic(...args) {
 		const oldArray = array.slice(0);
-		const result = Array.prototype[callback].call(array, ...args);
+		// eslint-disable-next-line @typescript-eslint/no-unsafe-call
+		const result = Array.prototype[callback].apply(array, args);
 		const properties = [];
 		const values = [];
 		for (const item of oldArray) {
@@ -186,27 +219,6 @@ function store(data) {
 	}
 	return createStore(data);
 }
-/**
- * Subscribes to value changes for a key in a store
- * @template {Data} T
- * @param {Store<T>} store
- * @param {number|string|symbol} key
- * @param {(newValue: any, oldValue?: any, origin?: string) => void} callback
- * @returns {void}
- */
-function subscribe(store, key, callback) {
-	const stored = subscriptions.get(store?.[stateKey]);
-	if (stored === undefined) {
-		return;
-	}
-	const keyAsString = getString(key);
-	const subscribers = stored.get(keyAsString);
-	if (subscribers === undefined) {
-		stored.set(keyAsString, new Set([callback]));
-	} else if (!subscribers.has(callback)) {
-		subscribers.add(callback);
-	}
-}
 function transformData(state, prefix, data, isArray) {
 	const value = isArray ? [] : Object.create(data, {});
 	for (const key in data) {
@@ -217,12 +229,29 @@ function transformData(state, prefix, data, isArray) {
 	return value;
 }
 function transformItem(state, prefix, key, value) {
-	if (value === undefined || value === null) {
-		return value;
-	}
-	return typeof value === 'object'
+	return typeof value === 'object' && value !== null
 		? createStore(value, state, getKey(prefix, key))
 		: value;
+}
+
+/**
+ * Subscribes to value changes for a key in a store
+ * @template {Data} T
+ * @param {Store<T>} store
+ * @param {number|string|symbol} key
+ * @param {(newValue: any, oldValue?: any, origin?: string) => void} callback
+ * @returns {void}
+ */
+function subscribe(store, key, callback) {
+	validate(store, key, callback);
+	const stored = subscriptions.get(store?.[stateKey]);
+	const keyAsString = getString(key);
+	const subscribers = stored.get(keyAsString);
+	if (subscribers === undefined) {
+		stored.set(keyAsString, new Set([callback]));
+	} else if (!subscribers.has(callback)) {
+		subscribers.add(callback);
+	}
 }
 /**
  * Unsubscribes from value changes for a key in a store
@@ -233,91 +262,204 @@ function transformItem(state, prefix, key, value) {
  * @returns {void}
  */
 function unsubscribe(store, key, callback) {
+	validate(store, key, callback);
 	const stored = subscriptions.get(store?.[stateKey]);
 	const subscribers = stored?.get(String(key));
 	subscribers?.delete(callback);
 }
+function validate(store, key, callback) {
+	if (!isStore(store)) {
+		throw new TypeError('Store must be a store');
+	}
+	if (!isKey(key)) {
+		throw new TypeError('Key must be a number, string, or symbol');
+	}
+	if (typeof callback !== 'function') {
+		throw new TypeError('Callback must be a function');
+	}
+}
 
-const blixt = 'blixt';
-const comment = `<!--${blixt}-->`;
-const data = new WeakMap();
-class Expression {
-	get value() {
-		return this.callback;
-	}
-	constructor(callback) {
-		this.callback = callback;
-	}
-}
-class Template {
-	/**
-	 * Creates a template
-	 * @param {TemplateStringsArray} strings
-	 * @param {...any} expressions
-	 */
-	constructor(strings, expressions) {
-		data.set(this, {
-			strings,
-			expressions: {
-				index: 0,
-				original: expressions ?? [],
-				values: [],
-			},
-		});
-	}
-	/**
-	 * Renders a template, on its own or for a parent
-	 * @param {ParentNode=} parent
-	 * @returns {Node}
-	 */
-	render(parent) {
-		const value = toString(this);
-		const rendered = createNodes(value);
-		const mapped = mapNodes(data, this, rendered);
-		parent?.append(mapped);
-		return parent ?? mapped;
-	}
-}
 /**
- * Creates a template
+ * Observes changes for properties used in a function
+ * @param {() => any} callback
+ * @param {{(value: any) => any}=} after
+ * @returns {any}
  */
-function template(strings, ...expressions) {
-	return new Template(strings, expressions);
-}
-function toString(template) {
-	const {strings, expressions} = data.get(template);
-	function express(value, expression) {
-		const isFunction = typeof expression === 'function';
-		if (
-			isFunction ||
-			expression instanceof Node ||
-			expression instanceof Template
-		) {
-			expressions.values.push(
-				isFunction ? new Expression(expression) : expression,
-			);
-			return value + comment;
-		}
-		if (Array.isArray(expression)) {
-			let expressed = '';
-			for (const exp of expression) {
-				expressed += express('', exp);
+function observe(callback, after) {
+	if (typeof callback !== 'function') {
+		throw new TypeError('Callback must be a function');
+	}
+	if (after !== undefined && typeof after !== 'function') {
+		throw new TypeError('After-callback must be a function');
+	}
+	const hasAfter = typeof after === 'function';
+	const id = Symbol(undefined);
+	const queue = () => {
+		cancelAnimationFrame(frame);
+		frame = requestAnimationFrame(() => {
+			frame = undefined;
+			run();
+		});
+	};
+	let current = observers.get(id) ?? new Map();
+	let frame;
+	function run() {
+		observers.set(id, new Map());
+		const value = callback();
+		const observed = observers.get(id) ?? new Map();
+		const currentEntries = Array.from(current.entries());
+		for (const [proxy, keys] of currentEntries) {
+			const newKeys = observed.get(proxy) ?? new Set();
+			const keysValues = Array.from(keys.values());
+			for (const key of keysValues) {
+				if (!newKeys.has(key)) {
+					unsubscribe(proxy, key, queue);
+				}
 			}
-			return value + expressed;
 		}
-		return value + getString(expression);
+		const observedEntries = Array.from(observed.entries());
+		for (const [proxy, keys] of observedEntries) {
+			const keysValues = Array.from(keys.values());
+			for (const key of keysValues) {
+				subscribe(proxy, key, queue);
+			}
+		}
+		current = observed;
+		return hasAfter ? after(value) : value;
 	}
-	let html = '';
-	// eslint-disable-next-line unicorn/no-for-loop
-	for (let index = 0; index < strings.length; index += 1) {
-		const value = strings[index];
-		const expression = expressions.original[index];
-		html += expression === undefined ? value : express(value, expression);
+	return run();
+}
+function observeKey(state, key) {
+	const proxy = proxies.get(state);
+	const values = Array.from(observers.values());
+	for (const map of values) {
+		const keys = map.get(proxy);
+		if (keys === undefined) {
+			map.set(proxy, new Set([key]));
+		} else {
+			keys.add(key);
+		}
 	}
-	return html;
 }
 
-function getData(attribute) {
+function observeAttribute(element, attribute, expression) {
+	const {name} = attribute;
+	const isBoolean = booleanAttributes.has(name.toLowerCase());
+	const isClass = classAttributeExpression.test(name);
+	const isStyle = styleAttributeExpression.test(name);
+	if (isBoolean || isClass || isStyle) {
+		element.removeAttribute(name);
+	}
+	if (isBoolean) {
+		observeBooleanAttribute(element, name, expression);
+	} else if (isClass) {
+		observeClassAttribute(element, name, expression);
+	} else if (isStyle) {
+		observeStyleAttribute(element, name, expression);
+	} else {
+		observeValueAttribute(element, name, expression);
+	}
+}
+function observeBooleanAttribute(element, name, expression) {
+	observe(expression.value, value => {
+		if (typeof value === 'boolean') {
+			element[name] = value;
+		}
+	});
+}
+function observeClassAttribute(element, name, expression) {
+	const classes = name
+		.split('.')
+		.slice(1)
+		.map(name => name.trim())
+		.filter(name => name.length > 0);
+	if (classes.length === 0) {
+		return;
+	}
+	observe(expression.value, value => {
+		if (value === true) {
+			element.classList.add(...classes);
+		} else {
+			element.classList.remove(...classes);
+		}
+	});
+}
+function observeStyleAttribute(element, name, expression) {
+	const [, first, second] = name.split('.');
+	const property = first.trim();
+	const suffix = second?.trim();
+	if (property.length === 0 || (suffix !== undefined && suffix.length === 0)) {
+		return;
+	}
+	observe(expression.value, value => {
+		if (
+			value === undefined ||
+			value === null ||
+			value === false ||
+			(value === true && suffix === undefined)
+		) {
+			element.style.removeProperty(property);
+		} else {
+			element.style.setProperty(
+				property,
+				value === true ? suffix : `${value}${suffix ?? ''}`,
+			);
+		}
+	});
+}
+function observeValueAttribute(element, name, expression) {
+	observe(expression.value, value => {
+		if (/^value$/i.test(name)) {
+			element.value = value;
+		}
+		if (value === undefined || value === null) {
+			element.removeAttribute(name);
+		} else {
+			element.setAttribute(name, value);
+		}
+	});
+}
+
+function observeContent(comment, expression) {
+	let current;
+	let isText = false;
+	observe(expression.value, value => {
+		const isArray = Array.isArray(value);
+		if (value === undefined || value === null || isArray) {
+			isText = false;
+			current =
+				isArray && value.length > 0
+					? updateArray(comment, current, value)
+					: current === undefined
+					? undefined
+					: replaceNodes(current, [[comment]], false);
+			return;
+		}
+		const node = createNode(value);
+		if (current !== undefined && isText && node instanceof Text) {
+			if (current[0][0].textContent !== node.textContent) {
+				current[0][0].textContent = node.textContent;
+			}
+			return;
+		}
+		isText = node instanceof Text;
+		current = replaceNodes(current ?? [[comment]], getNodes(node), true);
+	});
+}
+function updateArray(comment, current, array) {
+	return replaceNodes(
+		current ?? [[comment]],
+		getNodes(array.map(item => createNode(item))),
+		true,
+	);
+}
+
+function addEvent(element, attribute, expression) {
+	const {name, options} = getEventParameters(attribute.name);
+	element.addEventListener(name, expression.value, options);
+	element.removeAttribute(attribute.name);
+}
+function getEventParameters(attribute) {
 	let name = attribute.slice(1);
 	const options = {
 		passive: true,
@@ -325,19 +467,15 @@ function getData(attribute) {
 	if (name.includes(':')) {
 		const [event, ...items] = name.split(':');
 		name = event;
-		options.capture = items.includes('capture');
-		options.once = items.includes('once');
-		options.passive = !items.includes('active');
+		const normalised = new Set(items.map(item => item.toLowerCase()));
+		options.capture = normalised.has('capture');
+		options.once = normalised.has('once');
+		options.passive = !normalised.has('active');
 	}
 	return {
 		name,
 		options,
 	};
-}
-function handleEvent(element, attribute, expression) {
-	const event = getData(attribute.name);
-	element.addEventListener(event.name, expression.value, event.options);
-	element.removeAttribute(attribute.name);
 }
 
 function createNode(value) {
@@ -353,33 +491,41 @@ function createNodes(html) {
 	const element = document.createElement('template');
 	element.innerHTML = html;
 	const fragment = element.content.cloneNode(true);
+	const scripts = Array.from(fragment.querySelectorAll('script'));
+	for (const script of scripts) {
+		script.remove();
+	}
 	fragment.normalize();
 	return fragment;
 }
 function getNodes(value) {
-	if (value === undefined) {
-		return [];
-	}
 	const array = Array.isArray(value) ? value : [value];
-	return array.map(item =>
-		item instanceof DocumentFragment ? Array.from(item.childNodes) : [item],
-	);
+	return array
+		.filter(item => item instanceof Node)
+		.map(item =>
+			item instanceof DocumentFragment ? Array.from(item.childNodes) : [item],
+		);
 }
 function mapAttributes(element, expressions) {
 	const attributes = Array.from(element.attributes);
 	for (const attribute of attributes) {
-		if (attribute.value !== comment) {
-			continue;
-		}
-		const expression = expressions.values[expressions.index++];
+		const expression =
+			attribute.value === comment
+				? expressions.values[expressions.index++]
+				: undefined;
+		const isOnAttribute = attribute.name.toLowerCase().startsWith('on');
 		if (
+			isOnAttribute ||
 			!(expression instanceof Expression) ||
-			!(element instanceof HTMLElement)
+			!(element instanceof HTMLElement || element instanceof SVGElement)
 		) {
+			if (isOnAttribute) {
+				element.removeAttribute(attribute.name);
+			}
 			continue;
 		}
 		if (attribute.name.startsWith('@')) {
-			handleEvent(element, attribute, expression);
+			addEvent(element, attribute, expression);
 		} else {
 			observeAttribute(element, attribute, expression);
 		}
@@ -422,183 +568,80 @@ function setNode(comment, value) {
 	}
 }
 
-const attributes = new Set([
-	'checked',
-	'disabled',
-	'hidden',
-	'inert',
-	'multiple',
-	'open',
-	'readonly',
-	'required',
-	'selected',
-]);
-const observers = new Map();
-/**
- * Observes changes for properties used in a function
- * @param {() => any} callback
- * @param {{(value: any) => any}=} after
- * @returns {any}
- */
-function observe(callback, after) {
-	const hasAfter = typeof after === 'function';
-	const id = Symbol(undefined);
-	const queue = () => {
-		cancelAnimationFrame(frame);
-		frame = requestAnimationFrame(() => {
-			frame = undefined;
-			run();
+class Expression {
+	get value() {
+		return this.callback;
+	}
+	constructor(callback) {
+		this.callback = callback;
+	}
+}
+class Template {
+	/**
+	 * Creates a template
+	 * @param {TemplateStringsArray} strings
+	 * @param {...any} expressions
+	 */
+	constructor(strings, expressions) {
+		templateData.set(this, {
+			strings,
+			expressions: {
+				index: 0,
+				original: expressions ?? [],
+				values: [],
+			},
 		});
-	};
-	let current = observers.get(id) ?? new Map();
-	let frame;
-	function run() {
-		observers.set(id, new Map());
-		const value = callback();
-		const observed = observers.get(id) ?? new Map();
-		const currentEntries = Array.from(current.entries());
-		for (const [proxy, keys] of currentEntries) {
-			const newKeys = observed.get(proxy) ?? new Set();
-			const keysValues = Array.from(keys.values());
-			for (const key of keysValues) {
-				if (!newKeys.has(key)) {
-					unsubscribe(proxy, key, queue);
-				}
-			}
-		}
-		const observedEntries = Array.from(observed.entries());
-		for (const [proxy, keys] of observedEntries) {
-			const keysValues = Array.from(keys.values());
-			for (const key of keysValues) {
-				subscribe(proxy, key, queue);
-			}
-		}
-		current = observed;
-		return hasAfter ? after(value) : value;
 	}
-	return run();
-}
-function observeAttribute(element, attribute, expression) {
-	const {name} = attribute;
-	const isBoolean = attributes.has(name);
-	const isClass = /^class\./i.test(name);
-	const isStyle = /^style\./i.test(name);
-	if (isBoolean || isClass || isStyle) {
-		element.removeAttribute(name);
-	}
-	if (isBoolean) {
-		observeBooleanAttribute(element, name, expression);
-	} else if (isClass) {
-		observeClassAttribute(element, name, expression);
-	} else if (isStyle) {
-		observeStyleAttribute(element, name, expression);
-	} else {
-		observeValueAttribute(element, name, expression);
+	/**
+	 * Renders a template, on its own or for a parent
+	 * @param {ParentNode=} parent
+	 * @returns {Node}
+	 */
+	render(parent) {
+		const value = toString(this);
+		const rendered = createNodes(value);
+		const mapped = mapNodes(templateData, this, rendered);
+		parent?.append(mapped);
+		return parent ?? mapped;
 	}
 }
-function observeBooleanAttribute(element, name, expression) {
-	observe(expression.value, value => {
-		if (typeof value === 'boolean') {
-			element[name] = value;
-		}
-	});
+/**
+ * Creates a template
+ */
+function template(strings, ...expressions) {
+	return new Template(strings, expressions);
 }
-function observeClassAttribute(element, name, expression) {
-	const classes = name
-		.split('.')
-		.slice(1)
-		.map(name => name.trim())
-		.filter(name => name.length > 0);
-	if (classes.length === 0) {
-		return;
-	}
-	observe(expression.value, value => {
-		if (value === true) {
-			element.classList.add(...classes);
-		} else {
-			element.classList.remove(...classes);
-		}
-	});
-}
-function observeContent(comment, expression) {
-	let current;
-	let isText = false;
-	observe(expression.value, value => {
-		const isArray = Array.isArray(value);
-		if (value === undefined || value === null || isArray) {
-			isText = false;
-			current =
-				isArray && value.length > 0
-					? updateArray(comment, current, value)
-					: current === undefined
-					? undefined
-					: replaceNodes(current, [[comment]], false);
-			return;
-		}
-		const node = createNode(value);
-		if (current !== undefined && isText && node instanceof Text) {
-			if (current[0][0].textContent !== node.textContent) {
-				current[0][0].textContent = node.textContent;
-			}
-			return;
-		}
-		isText = node instanceof Text;
-		current = replaceNodes(current ?? [[comment]], getNodes(node), true);
-	});
-}
-function observeKey(state, key) {
-	const proxy = proxies.get(state);
-	const values = Array.from(observers.values());
-	for (const map of values) {
-		const keys = map.get(proxy);
-		if (keys === undefined) {
-			map.set(proxy, new Set([key]));
-		} else {
-			keys.add(key);
-		}
-	}
-}
-function observeStyleAttribute(element, name, expression) {
-	const [, first, second] = name.split('.');
-	const property = first.trim();
-	const suffix = second?.trim();
-	if (property.length === 0 || (suffix !== undefined && suffix.length === 0)) {
-		return;
-	}
-	observe(expression.value, value => {
+function toString(template) {
+	const {strings, expressions} = templateData.get(template);
+	function express(value, expression) {
+		const isFunction = typeof expression === 'function';
 		if (
-			value === undefined ||
-			value === null ||
-			value === false ||
-			(value === true && suffix === undefined)
+			isFunction ||
+			expression instanceof Node ||
+			expression instanceof Template
 		) {
-			element.style.removeProperty(property);
-		} else {
-			element.style.setProperty(
-				property,
-				value === true ? suffix : `${value}${suffix ?? ''}`,
+			expressions.values.push(
+				isFunction ? new Expression(expression) : expression,
 			);
+			return value + comment;
 		}
-	});
-}
-function observeValueAttribute(element, name, expression) {
-	observe(expression.value, value => {
-		if (name === 'value') {
-			element.value = value;
+		if (Array.isArray(expression)) {
+			let expressed = '';
+			for (const exp of expression) {
+				expressed += express('', exp);
+			}
+			return value + expressed;
 		}
-		if (value === undefined || value === null) {
-			element.removeAttribute(name);
-		} else {
-			element.setAttribute(name, value);
-		}
-	});
-}
-function updateArray(comment, current, array) {
-	return replaceNodes(
-		current ?? [[comment]],
-		getNodes(array.map(item => createNode(item))),
-		true,
-	);
+		return value + getString(expression);
+	}
+	let html = '';
+	// eslint-disable-next-line unicorn/no-for-loop
+	for (let index = 0; index < strings.length; index += 1) {
+		const value = strings[index];
+		const expression = expressions.original[index];
+		html += expression === undefined ? value : express(value, expression);
+	}
+	return html;
 }
 
 export {Template, isStore, observe, store, subscribe, template, unsubscribe};
