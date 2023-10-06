@@ -1,5 +1,5 @@
 var Blixt = (function (exports) {
-	'use strict';
+	('use strict');
 
 	const blixt = 'blixt';
 	const booleanAttributes = new Set([
@@ -17,19 +17,22 @@ var Blixt = (function (exports) {
 	const comment = `<!--${blixt}-->`;
 	const keyTypes = new Set(['number', 'string', 'symbol']);
 	const observers = new Map();
-	const period = '.';
+	const onAttributeExpression = /^on/i;
 	const proxies = new WeakMap();
+	const sourceAttributeNameExpression = /^(href|src|xlink:href)$/i;
+	const sourceAttributeValueExpression = /(data:text\/html|javascript:)/i;
 	const stateKey = '__state';
 	const styleAttributeExpression = /^style\./i;
 	const subscriptions = new WeakMap();
 	const templateData = new WeakMap();
+	const valueAttributeExpression = /^value$/i;
 
 	function getKey(...parts) {
 		return parts
 			.filter(part => part !== undefined)
 			.map(part => getString(part).trim())
 			.filter(part => part.length > 0)
-			.join(period);
+			.join('.');
 	}
 	function getString(value) {
 		return typeof value === 'string' ? value : String(value);
@@ -38,7 +41,7 @@ var Blixt = (function (exports) {
 		if (typeof data !== 'object') {
 			return data;
 		}
-		const parts = key.split(period);
+		const parts = key.split('.');
 		let value = data;
 		for (const part of parts) {
 			if (value === undefined) {
@@ -416,7 +419,7 @@ var Blixt = (function (exports) {
 	}
 	function observeValueAttribute(element, name, expression) {
 		observe(expression.value, value => {
-			if (/^value$/i.test(name)) {
+			if (valueAttributeExpression.test(name)) {
 				element.value = value;
 			}
 			if (value === undefined || value === null) {
@@ -516,22 +519,24 @@ var Blixt = (function (exports) {
 	function mapAttributes(element, expressions) {
 		const attributes = Array.from(element.attributes);
 		for (const attribute of attributes) {
+			const {name, value} = attribute;
 			const expression =
-				attribute.value === comment
-					? expressions.values[expressions.index++]
-					: undefined;
-			const isOnAttribute = attribute.name.toLowerCase().startsWith('on');
+				value === comment ? expressions.values[expressions.index++] : undefined;
+			const badAttribute =
+				onAttributeExpression.test(name) ||
+				(sourceAttributeNameExpression.test(name) &&
+					sourceAttributeValueExpression.test(value));
 			if (
-				isOnAttribute ||
+				badAttribute ||
 				!(expression instanceof Expression) ||
 				!(element instanceof HTMLElement || element instanceof SVGElement)
 			) {
-				if (isOnAttribute) {
-					element.removeAttribute(attribute.name);
+				if (badAttribute) {
+					element.removeAttribute(name);
 				}
 				continue;
 			}
-			if (attribute.name.startsWith('@')) {
+			if (name.startsWith('@')) {
 				addEvent(element, attribute, expression);
 			} else {
 				observeAttribute(element, attribute, expression);

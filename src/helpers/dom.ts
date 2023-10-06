@@ -1,4 +1,10 @@
-import {blixt, comment} from '../data';
+import {
+	blixt,
+	comment,
+	onAttributeExpression,
+	sourceAttributeNameExpression,
+	sourceAttributeValueExpression,
+} from '../data';
 import type {
 	TemplateData,
 	TemplateExpressionValue,
@@ -59,26 +65,29 @@ export function mapAttributes(
 	const attributes = Array.from(element.attributes);
 
 	for (const attribute of attributes) {
-		const expression =
-			attribute.value === comment
-				? expressions.values[expressions.index++]
-				: undefined;
+		const {name, value} = attribute;
 
-		const isOnAttribute = attribute.name.toLowerCase().startsWith('on');
+		const expression =
+			value === comment ? expressions.values[expressions.index++] : undefined;
+
+		const badAttribute =
+			onAttributeExpression.test(name) ||
+			(sourceAttributeNameExpression.test(name) &&
+				sourceAttributeValueExpression.test(value));
 
 		if (
-			isOnAttribute ||
+			badAttribute ||
 			!(expression instanceof Expression) ||
 			!(element instanceof HTMLElement || element instanceof SVGElement)
 		) {
-			if (isOnAttribute) {
-				element.removeAttribute(attribute.name);
+			if (badAttribute) {
+				element.removeAttribute(name);
 			}
 
 			continue;
 		}
 
-		if (attribute.name.startsWith('@')) {
+		if (name.startsWith('@')) {
 			addEvent(element, attribute, expression);
 		} else {
 			observeAttribute(element, attribute, expression);

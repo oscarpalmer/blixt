@@ -58,6 +58,8 @@ test('observeAttributes', () => {
 	@click="${() => {
 		stored.boolean = !stored.boolean;
 	}}"
+	onclick="event"
+	href="javascript:alert('blixt');"
 >`.render(context);
 
 	const element = context.querySelector('#observe_attributes');
@@ -71,6 +73,8 @@ test('observeAttributes', () => {
 	expect(element.style.color).toEqual('red');
 	expect(element.style.fontSize).toEqual('2em');
 	expect(element.getAttribute('@click')).toEqual(null);
+	expect(element.getAttribute('onclick')).toEqual(null);
+	expect(element.getAttribute('href')).toEqual(null);
 
 	stored.boolean = false;
 

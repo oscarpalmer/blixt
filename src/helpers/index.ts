@@ -1,4 +1,4 @@
-import {keyTypes, period} from '../data';
+import {keyTypes} from '../data';
 import type {Key} from '../models';
 
 export function getKey(...parts: Array<Key | undefined>): string {
@@ -6,7 +6,7 @@ export function getKey(...parts: Array<Key | undefined>): string {
 		.filter(part => part !== undefined)
 		.map(part => getString(part).trim())
 		.filter(part => part.length > 0)
-		.join(period);
+		.join('.');
 }
 
 export function getString(value: any): string {
@@ -18,7 +18,7 @@ export function getValue(data: any, key: string): any {
 		return data;
 	}
 
-	const parts = key.split(period);
+	const parts = key.split('.');
 
 	let value: unknown = data;
 

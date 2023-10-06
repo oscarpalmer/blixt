@@ -2,6 +2,7 @@ import {
 	booleanAttributes,
 	classAttributeExpression,
 	styleAttributeExpression,
+	valueAttributeExpression,
 } from '../data';
 import type {Expression} from '../template';
 import {observe} from '.';
@@ -105,7 +106,7 @@ function observeValueAttribute(
 	expression: Expression,
 ): void {
 	observe(expression.value, (value: any) => {
-		if (/^value$/i.test(name)) {
+		if (valueAttributeExpression.test(name)) {
 			(element as HTMLInputElement).value = value as never;
 		}
 
