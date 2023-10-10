@@ -14,6 +14,7 @@ var Blixt = (function (exports) {
 		'selected',
 	]);
 	const classAttributeExpression = /^class\./i;
+	const documentFragmentConstructor = /^documentfragment$/i;
 	const comment = `<!--${blixt}-->`;
 	const keyTypes = new Set(['number', 'string', 'symbol']);
 	const observers = new Map();
@@ -418,8 +419,9 @@ var Blixt = (function (exports) {
 		});
 	}
 	function observeValueAttribute(element, name, expression) {
+		const isValueAttribute = valueAttributeExpression.test(name);
 		observe(expression.value, value => {
-			if (valueAttributeExpression.test(name)) {
+			if (isValueAttribute) {
 				element.value = value;
 			}
 			if (value === undefined || value === null) {
@@ -442,26 +444,64 @@ var Blixt = (function (exports) {
 						? updateArray(comment, current, value)
 						: current === undefined
 						? undefined
-						: replaceNodes(current, [[comment]], false);
+						: replaceNodes(current, [{nodes: [comment]}], false);
 				return;
 			}
 			const node = createNode(value);
 			if (current !== undefined && isText && node instanceof Text) {
-				if (current[0][0].textContent !== node.textContent) {
-					current[0][0].textContent = node.textContent;
+				if (current[0].nodes[0].textContent !== node.textContent) {
+					current[0].nodes[0].textContent = node.textContent;
 				}
 				return;
 			}
 			isText = node instanceof Text;
-			current = replaceNodes(current ?? [[comment]], getNodes(node), true);
+			current = replaceNodes(
+				current ?? [{nodes: [comment]}],
+				getObservedItems(node),
+				true,
+			);
 		});
 	}
 	function updateArray(comment, current, array) {
-		return replaceNodes(
-			current ?? [[comment]],
-			getNodes(array.map(item => createNode(item))),
-			true,
+		let templated = array.filter(
+			item => item instanceof Template && item.id !== undefined,
 		);
+		if (new Set(templated.map(template => template.id)).size !== array.length) {
+			templated = [];
+		}
+		if (current === undefined || templated.length !== array.length) {
+			return replaceNodes(
+				current ?? [{nodes: [comment]}],
+				templated.length === array.length
+					? templated.map(template => getObservedItem(template))
+					: getObservedItems(array.map(item => createNode(item))),
+				true,
+			);
+		}
+		const observed = [];
+		for (const template of templated) {
+			const existing = current.find(item => item.identifier === template.id);
+			if (existing === undefined) {
+				observed.push(getObservedItem(template));
+			} else {
+				observed.push(existing);
+			}
+		}
+		let position = current[0].nodes[0];
+		for (const item of observed) {
+			for (const node of item.nodes) {
+				position.after(node);
+				position = node;
+			}
+		}
+		for (const item of current) {
+			if (observed.findIndex(o => o.identifier === item.identifier) === -1) {
+				for (const node of item.nodes) {
+					node.remove();
+				}
+			}
+		}
+		return observed;
 	}
 
 	function addEvent(element, attribute, expression) {
@@ -508,13 +548,32 @@ var Blixt = (function (exports) {
 		fragment.normalize();
 		return fragment;
 	}
-	function getNodes(value) {
+	function getObservedItem(value) {
+		return {
+			identifier: value instanceof Template ? value.id : undefined,
+			nodes: getObservedItems(createNode(value)).flatMap(item => item.nodes),
+		};
+	}
+	function getObservedItems(value) {
 		const array = Array.isArray(value) ? value : [value];
 		return array
 			.filter(item => item instanceof Node)
 			.map(item =>
-				item instanceof DocumentFragment ? Array.from(item.childNodes) : [item],
-			);
+				documentFragmentConstructor.test(item.constructor.name)
+					? Array.from(item.childNodes)
+					: [item],
+			)
+			.map(items => ({nodes: items}));
+	}
+	function isBadAttribute(attribute) {
+		const {name, value} = attribute;
+		if (onAttributeExpression.test(name)) {
+			return true;
+		}
+		return (
+			sourceAttributeNameExpression.test(name) &&
+			sourceAttributeValueExpression.test(value)
+		);
 	}
 	function mapAttributes(element, expressions) {
 		const attributes = Array.from(element.attributes);
@@ -522,10 +581,7 @@ var Blixt = (function (exports) {
 			const {name, value} = attribute;
 			const expression =
 				value === comment ? expressions.values[expressions.index++] : undefined;
-			const badAttribute =
-				onAttributeExpression.test(name) ||
-				(sourceAttributeNameExpression.test(name) &&
-					sourceAttributeValueExpression.test(value));
+			const badAttribute = isBadAttribute(attribute);
 			if (
 				badAttribute ||
 				!(expression instanceof Expression) ||
@@ -561,12 +617,12 @@ var Blixt = (function (exports) {
 		return node;
 	}
 	function replaceNodes(from, to, set) {
-		const items = (from ?? []).flat();
-		for (const item of items) {
-			if (items.indexOf(item) === 0) {
-				item.before(...to.flat());
+		const nodes = (from ?? []).flatMap(item => item.nodes);
+		for (const node of nodes) {
+			if (nodes.indexOf(node) === 0) {
+				node.before(...to.flatMap(item => item.nodes));
 			}
-			item.remove();
+			node.remove();
 		}
 		return set ? to : undefined;
 	}
@@ -574,8 +630,11 @@ var Blixt = (function (exports) {
 		if (value instanceof Expression) {
 			observeContent(comment, value);
 		} else {
+			const node = createNode(value);
 			comment.replaceWith(
-				...getNodes(value instanceof Template ? value.render() : value).flat(),
+				...(documentFragmentConstructor.test(node.constructor.name)
+					? Array.from(node.childNodes)
+					: [node]),
 			);
 		}
 	}
@@ -590,6 +649,13 @@ var Blixt = (function (exports) {
 	}
 	class Template {
 		/**
+		 * Gets the template's ID
+		 * @returns {(number|string|symbol)=}
+		 */
+		get id() {
+			return this.identifier;
+		}
+		/**
 		 * Creates a template
 		 * @param {TemplateStringsArray} strings
 		 * @param {...any} expressions
@@ -603,6 +669,17 @@ var Blixt = (function (exports) {
 					values: [],
 				},
 			});
+		}
+		/**
+		 * Sets the template's ID to uniquely identify it in a list of templates
+		 * @param {number|string|symbol} key
+		 * @returns {Template}
+		 */
+		identify(key) {
+			if (this.identifier === undefined && isKey(key)) {
+				this.identifier = key;
+			}
+			return this;
 		}
 		/**
 		 * Renders a template, on its own or for a parent

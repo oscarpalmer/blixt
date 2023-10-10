@@ -2,6 +2,8 @@ import {expect, test} from 'bun:test';
 import {observe} from '../src/observer';
 import {store} from '../src/store';
 import {template} from '../src/template';
+import {updateArray} from '../src/observer/content';
+import type {ObservedItem} from '../src/models';
 
 const context = document.createElement('body');
 
@@ -122,4 +124,40 @@ ${'basic text'}`.render(context);
 		expect(third.nextSibling).toBeInstanceOf(Text);
 		expect(third.nextSibling.textContent).toEqual('basic text');
 	}, 25);
+});
+
+test('updateArray', () => {
+	let items: ObservedItem[] | undefined;
+
+	function callback(ids: number[]) {
+		items = updateArray(
+			comment,
+			items,
+			ids.map(id => template`<p>${id}</p>`.identify(id)),
+		);
+
+		expect(items.length).toEqual(ids.length);
+
+		for (const id of ids) {
+			expect(items[ids.indexOf(id)].identifier).toEqual(id);
+		}
+	}
+
+	const comment = document.createComment('updateArray');
+
+	context.append(comment);
+
+	callback([1, 2, 3]);
+	callback([1, 2, 3, 4]);
+	callback([2, 3]);
+
+	items = updateArray(
+		comment,
+		items,
+		[1, 2, 3].map(id => template`<p>${id}</p>`.identify(1)),
+	);
+
+	expect(items.length).toEqual(3);
+
+	expect(items.every(item => item.identifier === undefined)).toEqual(true);
 });

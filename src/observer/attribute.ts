@@ -5,7 +5,7 @@ import {
 	valueAttributeExpression,
 } from '../data';
 import type {Expression} from '../template';
-import {observe} from '.';
+import {observe} from './index';
 
 export function observeAttribute(
 	element: HTMLElement | SVGElement,
@@ -105,8 +105,10 @@ function observeValueAttribute(
 	name: string,
 	expression: Expression,
 ): void {
+	const isValueAttribute = valueAttributeExpression.test(name);
+
 	observe(expression.value, (value: any) => {
-		if (valueAttributeExpression.test(name)) {
+		if (isValueAttribute) {
 			(element as HTMLInputElement).value = value as never;
 		}
 

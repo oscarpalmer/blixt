@@ -17,6 +17,8 @@ export const booleanAttributes = new Set([
 
 export const classAttributeExpression = /^class\./i;
 
+export const documentFragmentConstructor = /^documentfragment$/i;
+
 export const comment = `<!--${blixt}-->`;
 
 export const keyTypes = new Set<Key>(['number', 'string', 'symbol']);

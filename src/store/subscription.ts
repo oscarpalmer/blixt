@@ -1,7 +1,7 @@
 import {stateKey, subscriptions} from '../data';
 import {getString, isKey} from '../helpers';
 import type {Data, Key, State, Store, Subscriber} from '../models';
-import {isStore} from '.';
+import {isStore} from './index';
 
 /**
  * Subscribes to value changes for a key in a store

@@ -1,5 +1,6 @@
 import {comment, templateData} from './data';
-import {getString} from './helpers';
+import {getString, isKey} from './helpers';
+import type {Key} from './models';
 import {createNodes, mapNodes} from './helpers/dom';
 
 export class Expression {
@@ -11,6 +12,16 @@ export class Expression {
 }
 
 export class Template {
+	private identifier: Key | undefined;
+
+	/**
+	 * Gets the template's ID
+	 * @returns {(number|string|symbol)=}
+	 */
+	get id(): Key | undefined {
+		return this.identifier;
+	}
+
 	/**
 	 * Creates a template
 	 * @param {TemplateStringsArray} strings
@@ -25,6 +36,19 @@ export class Template {
 				values: [],
 			},
 		});
+	}
+
+	/**
+	 * Sets the template's ID to uniquely identify it in a list of templates
+	 * @param {number|string|symbol} key
+	 * @returns {Template}
+	 */
+	identify(key: Key): this {
+		if (this.identifier === undefined && isKey(key)) {
+			this.identifier = key;
+		}
+
+		return this;
 	}
 
 	/**

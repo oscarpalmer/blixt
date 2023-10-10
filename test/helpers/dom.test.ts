@@ -3,7 +3,7 @@ import {template, Template} from '../../src/template';
 import {
 	createNode,
 	createNodes,
-	getNodes,
+	getObservedItems,
 	replaceNodes,
 } from '../../src/helpers/dom';
 
@@ -30,7 +30,7 @@ test('createNode:template', () => {
 
 	const node = createNode(templated);
 
-	expect(node).toBeInstanceOf(DocumentFragment);
+	expect(node.constructor.name).toEqual('DocumentFragment');
 });
 
 test('createNodes', () => {
@@ -54,17 +54,17 @@ test('getNodes', () => {
 		new Template(['<p>Hello, world</p>']).render(),
 	];
 
-	const nodes = getNodes(original);
+	const nodes = getObservedItems(original);
 
 	expect(nodes.length).toEqual(3);
 
-	expect(nodes[0].length).toEqual(1);
-	expect(nodes[1].length).toEqual(1);
-	expect(nodes[2].length).toEqual(1);
+	expect(nodes[0].nodes.length).toEqual(1);
+	expect(nodes[1].nodes.length).toEqual(1);
+	expect(nodes[2].nodes.length).toEqual(1);
 
-	expect(nodes[0][0]).toBeInstanceOf(Text);
-	expect(nodes[1][0]).toBeInstanceOf(HTMLDivElement);
-	expect(nodes[2][0]).toBeInstanceOf(HTMLParagraphElement);
+	expect(nodes[0].nodes[0]).toBeInstanceOf(Text);
+	expect(nodes[1].nodes[0]).toBeInstanceOf(HTMLDivElement);
+	expect(nodes[2].nodes[0]).toBeInstanceOf(HTMLParagraphElement);
 });
 
 test('replaceNodes', () => {
@@ -90,12 +90,12 @@ test('replaceNodes', () => {
 			new Template(['<p>Hello, world</p>']).render(),
 		];
 
-		const nodes = getNodes(original);
+		const items = getObservedItems(original);
 
-		for (const node of nodes) {
-			document.body.append(...node);
+		for (const item of items) {
+			document.body.append(...item.nodes);
 		}
 
-		callback(nodes);
+		callback(items);
 	}
 });

@@ -1,9 +1,16 @@
-import {createNode, getNodes, replaceNodes} from '../helpers/dom';
+import type {Key, ObservedItem} from '../models';
+import {
+	createNode,
+	getObservedItem,
+	getObservedItems,
+	replaceNodes,
+} from '../helpers/dom';
 import type {Expression} from '../template';
-import {observe} from '.';
+import {Template} from '../template';
+import {observe} from './index';
 
 export function observeContent(comment: Comment, expression: Expression): void {
-	let current: ChildNode[][] | undefined;
+	let current: ObservedItem[] | undefined;
 	let isText = false;
 
 	observe(expression.value, (value: any) => {
@@ -17,7 +24,7 @@ export function observeContent(comment: Comment, expression: Expression): void {
 					? updateArray(comment, current, value)
 					: current === undefined
 					? undefined
-					: replaceNodes(current, [[comment]], false)!;
+					: replaceNodes(current, [{nodes: [comment]}], false)!;
 
 			return;
 		}
@@ -25,8 +32,8 @@ export function observeContent(comment: Comment, expression: Expression): void {
 		const node = createNode(value);
 
 		if (current !== undefined && isText && node instanceof Text) {
-			if (current[0][0].textContent !== node.textContent) {
-				current[0][0].textContent = node.textContent;
+			if (current[0].nodes[0].textContent !== node.textContent) {
+				current[0].nodes[0].textContent = node.textContent;
 			}
 
 			return;
@@ -34,18 +41,66 @@ export function observeContent(comment: Comment, expression: Expression): void {
 
 		isText = node instanceof Text;
 
-		current = replaceNodes(current ?? [[comment]], getNodes(node), true);
+		current = replaceNodes(
+			current ?? [{nodes: [comment]}],
+			getObservedItems(node),
+			true,
+		);
 	});
 }
 
 export function updateArray(
 	comment: Comment,
-	current: ChildNode[][] | undefined,
+	current: ObservedItem[] | undefined,
 	array: any[],
-): ChildNode[][] {
-	return replaceNodes(
-		current ?? [[comment]],
-		getNodes(array.map(item => createNode(item))),
-		true,
-	)!;
+): ObservedItem[] {
+	let templated = array.filter(
+		item => item instanceof Template && item.id !== undefined,
+	) as Template[];
+
+	if (new Set(templated.map(template => template.id)).size !== array.length) {
+		templated = [];
+	}
+
+	if (current === undefined || templated.length !== array.length) {
+		return replaceNodes(
+			current ?? [{nodes: [comment]}],
+			templated.length === array.length
+				? templated.map(template => getObservedItem(template))
+				: getObservedItems(array.map(item => createNode(item))),
+			true,
+		)!;
+	}
+
+	const observed = [];
+
+	for (const template of templated) {
+		const existing = current.find(item => item.identifier === template.id);
+
+		if (existing === undefined) {
+			observed.push(getObservedItem(template));
+		} else {
+			observed.push(existing);
+		}
+	}
+
+	let position = current[0].nodes[0];
+
+	for (const item of observed) {
+		for (const node of item.nodes) {
+			position.after(node);
+
+			position = node;
+		}
+	}
+
+	for (const item of current) {
+		if (observed.findIndex(o => o.identifier === item.identifier) === -1) {
+			for (const node of item.nodes) {
+				node.remove();
+			}
+		}
+	}
+
+	return observed;
 }

@@ -1,11 +1,13 @@
 import {
 	blixt,
 	comment,
+	documentFragmentConstructor,
 	onAttributeExpression,
 	sourceAttributeNameExpression,
 	sourceAttributeValueExpression,
 } from '../data';
 import type {
+	ObservedItem,
 	TemplateData,
 	TemplateExpressionValue,
 	TemplateExpressions,
@@ -48,14 +50,37 @@ export function createNodes(html: string): DocumentFragment {
 	return fragment as DocumentFragment;
 }
 
-export function getNodes(value: Node | Node[]): ChildNode[][] {
+export function getObservedItem(value: any): ObservedItem {
+	return {
+		identifier: value instanceof Template ? value.id : undefined,
+		nodes: getObservedItems(createNode(value)).flatMap(item => item.nodes),
+	};
+}
+
+export function getObservedItems(value: Node | Node[]): ObservedItem[] {
 	const array = Array.isArray(value) ? value : [value];
 
 	return array
 		.filter(item => item instanceof Node)
 		.map(item =>
-			item instanceof DocumentFragment ? Array.from(item.childNodes) : [item],
-		) as ChildNode[][];
+			documentFragmentConstructor.test(item.constructor.name)
+				? Array.from(item.childNodes)
+				: [item],
+		)
+		.map(items => ({nodes: items as ChildNode[]}));
+}
+
+export function isBadAttribute(attribute: Attr): boolean {
+	const {name, value} = attribute;
+
+	if (onAttributeExpression.test(name)) {
+		return true;
+	}
+
+	return (
+		sourceAttributeNameExpression.test(name) &&
+		sourceAttributeValueExpression.test(value)
+	);
 }
 
 export function mapAttributes(
@@ -70,10 +95,7 @@ export function mapAttributes(
 		const expression =
 			value === comment ? expressions.values[expressions.index++] : undefined;
 
-		const badAttribute =
-			onAttributeExpression.test(name) ||
-			(sourceAttributeNameExpression.test(name) &&
-				sourceAttributeValueExpression.test(value));
+		const badAttribute = isBadAttribute(attribute);
 
 		if (
 			badAttribute ||
@@ -124,18 +146,18 @@ export function mapNodes(
 }
 
 export function replaceNodes(
-	from: ChildNode[][],
-	to: ChildNode[][],
+	from: ObservedItem[],
+	to: ObservedItem[],
 	set: boolean,
-): ChildNode[][] | undefined {
-	const items = (from ?? []).flat();
+): ObservedItem[] | undefined {
+	const nodes = (from ?? []).flatMap(item => item.nodes);
 
-	for (const item of items) {
-		if (items.indexOf(item) === 0) {
-			item.before(...to.flat());
+	for (const node of nodes) {
+		if (nodes.indexOf(node) === 0) {
+			node.before(...to.flatMap(item => item.nodes));
 		}
 
-		item.remove();
+		node.remove();
 	}
 
 	return set ? to : undefined;
@@ -145,8 +167,11 @@ export function setNode(comment: Comment, value: TemplateExpressionValue) {
 	if (value instanceof Expression) {
 		observeContent(comment, value);
 	} else {
+		const node = createNode(value);
 		comment.replaceWith(
-			...getNodes(value instanceof Template ? value.render() : value).flat(),
+			...(documentFragmentConstructor.test(node.constructor.name)
+				? Array.from(node.childNodes)
+				: [node]),
 		);
 	}
 }

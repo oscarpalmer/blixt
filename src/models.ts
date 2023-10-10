@@ -17,6 +17,11 @@ export type HandleArrayParameters = {
 
 export type Key = number | string | symbol;
 
+export type ObservedItem = {
+	identifier?: Key;
+	nodes: ChildNode[];
+};
+
 // eslint-disable-next-line @typescript-eslint/no-extraneous-class
 export class State {}
 
