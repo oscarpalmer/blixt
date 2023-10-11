@@ -27,6 +27,17 @@ const subscriptions = new WeakMap();
 const templateData = new WeakMap();
 const valueAttributeExpression = /^value$/i;
 
+function compareArrayOrder(first, second) {
+	const target = first.length > second.length ? second : first;
+	if (
+		!(first.length > second.length ? first : second)
+			.filter(key => target.includes(key))
+			.every((key, index) => target[index] === key)
+	) {
+		return 'dissimilar';
+	}
+	return first.length > second.length ? 'removed' : 'added';
+}
 function getKey(...parts) {
 	return parts
 		.filter(part => part !== undefined)
@@ -456,36 +467,48 @@ function updateArray(comment, current, array) {
 	let templated = array.filter(
 		item => item instanceof Template && item.id !== undefined,
 	);
-	if (new Set(templated.map(template => template.id)).size !== array.length) {
+	const identifiers = templated.map(template => template.id);
+	if (new Set(identifiers).size !== array.length) {
 		templated = [];
 	}
-	if (current === undefined || templated.length !== array.length) {
+	if (current === undefined || templated.length === 0) {
 		return replaceNodes(
 			current ?? [{nodes: [comment]}],
-			templated.length === array.length
+			templated.length > 0
 				? templated.map(template => getObservedItem(template))
 				: getObservedItems(array.map(item => createNode(item))),
 			true,
 		);
 	}
+	const oldIdentifiers = current.map(item => item.identifier);
+	const compared = compareArrayOrder(oldIdentifiers, identifiers);
 	const observed = [];
 	for (const template of templated) {
-		const existing = current.find(item => item.identifier === template.id);
-		if (existing === undefined) {
-			observed.push(getObservedItem(template));
-		} else {
-			observed.push(existing);
-		}
+		observed.push(
+			current.find(item => item.identifier === template.id) ??
+				getObservedItem(template),
+		);
 	}
 	let position = current[0].nodes[0];
-	for (const item of observed) {
-		for (const node of item.nodes) {
-			position.after(node);
-			position = node;
+	if (compared !== 'removed') {
+		for (const item of observed) {
+			for (const node of item.nodes) {
+				if (
+					compared === 'dissimilar' ||
+					!oldIdentifiers.includes(item.identifier)
+				) {
+					position.after(node);
+				}
+				position = node;
+			}
 		}
 	}
 	for (const item of current) {
-		if (observed.findIndex(o => o.identifier === item.identifier) === -1) {
+		if (
+			observed.findIndex(
+				observedItem => observedItem.identifier === item.identifier,
+			) === -1
+		) {
 			for (const node of item.nodes) {
 				node.remove();
 			}

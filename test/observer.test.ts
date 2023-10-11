@@ -150,6 +150,7 @@ test('updateArray', () => {
 	callback([1, 2, 3]);
 	callback([1, 2, 3, 4]);
 	callback([2, 3]);
+	callback([3, 2]);
 
 	items = updateArray(
 		comment,
@@ -158,6 +159,5 @@ test('updateArray', () => {
 	);
 
 	expect(items.length).toEqual(3);
-
 	expect(items.every(item => item.identifier === undefined)).toEqual(true);
 });

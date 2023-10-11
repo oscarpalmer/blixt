@@ -1,6 +1,23 @@
 import {keyTypes} from '../data';
 import type {Key} from '../models';
 
+export function compareArrayOrder(
+	first: Key[],
+	second: Key[],
+): 'added' | 'dissimilar' | 'removed' {
+	const target = first.length > second.length ? second : first;
+
+	if (
+		!(first.length > second.length ? first : second)
+			.filter(key => target.includes(key))
+			.every((key, index) => target[index] === key)
+	) {
+		return 'dissimilar';
+	}
+
+	return first.length > second.length ? 'removed' : 'added';
+}
+
 export function getKey(...parts: Array<Key | undefined>): string {
 	return parts
 		.filter(part => part !== undefined)
