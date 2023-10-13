@@ -149,7 +149,6 @@ function handleArray(parameters: HandleArrayParameters): unknown {
 	function synthetic(...args: any[]) {
 		const oldArray = array.slice(0);
 
-		// eslint-disable-next-line @typescript-eslint/no-unsafe-call
 		const result = Array.prototype[callback as never].apply(
 			array,
 			args,

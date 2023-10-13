@@ -91,30 +91,35 @@ export function updateArray(
 	let position = current[0].nodes[0];
 
 	if (compared !== 'removed') {
-		for (const item of observed) {
-			for (const node of item.nodes) {
-				if (
-					compared === 'dissimilar' ||
-					!oldIdentifiers.includes(item.identifier!)
-				) {
-					position.after(node);
-				}
+		const items = observed.flatMap(item =>
+			item.nodes.map(node => ({
+				id: item.identifier!,
+				value: node,
+			})),
+		);
 
-				position = node;
+		const prepend =
+			compared === 'added' && !oldIdentifiers.includes(identifiers[0]);
+
+		for (const item of items) {
+			if (compared === 'dissimilar' || !oldIdentifiers.includes(item.id)) {
+				if (items.indexOf(item) === 0 && prepend) {
+					position.before(item.value);
+				} else {
+					position.after(item.value);
+				}
 			}
+
+			position = item.value;
 		}
 	}
 
-	for (const item of current) {
-		if (
-			observed.findIndex(
-				observedItem => observedItem.identifier === item.identifier,
-			) === -1
-		) {
-			for (const node of item.nodes) {
-				node.remove();
-			}
-		}
+	const nodes = current
+		.filter(item => !identifiers.includes(item.identifier!))
+		.flatMap(item => item.nodes);
+
+	for (const node of nodes) {
+		node.remove();
 	}
 
 	return observed;

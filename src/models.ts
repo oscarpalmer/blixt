@@ -22,7 +22,6 @@ export type ObservedItem = {
 	nodes: ChildNode[];
 };
 
-// eslint-disable-next-line @typescript-eslint/no-extraneous-class
 export class State {}
 
 export type Store<T extends Data> = {

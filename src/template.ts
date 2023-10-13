@@ -57,9 +57,9 @@ export class Template {
 	 * @returns {Node}
 	 */
 	render(parent?: ParentNode): Node {
-		const value = toString(this);
-		const rendered = createNodes(value);
-		const mapped = mapNodes(templateData, this, rendered);
+		const asString = toString(this);
+		const nodes = createNodes(asString);
+		const mapped = mapNodes(templateData, this, nodes);
 
 		parent?.append(mapped);
 
@@ -109,7 +109,6 @@ function toString(template: Template): string {
 
 	let html = '';
 
-	// eslint-disable-next-line unicorn/no-for-loop
 	for (let index = 0; index < strings.length; index += 1) {
 		const value = strings[index];
 		const expression = expressions.original[index] as unknown;

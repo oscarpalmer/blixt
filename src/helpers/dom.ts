@@ -23,11 +23,9 @@ export function createNode(value: any): Node {
 		return value;
 	}
 
-	if (value instanceof Template) {
-		return value.render();
-	}
-
-	return document.createTextNode(getString(value));
+	return value instanceof Template
+		? value.render()
+		: document.createTextNode(getString(value));
 }
 
 export function createNodes(html: string): DocumentFragment {
@@ -163,15 +161,21 @@ export function replaceNodes(
 	return set ? to : undefined;
 }
 
-export function setNode(comment: Comment, value: TemplateExpressionValue) {
+export function setNode(
+	comment: Comment,
+	value: TemplateExpressionValue,
+): void {
 	if (value instanceof Expression) {
 		observeContent(comment, value);
-	} else {
-		const node = createNode(value);
-		comment.replaceWith(
-			...(documentFragmentConstructor.test(node.constructor.name)
-				? Array.from(node.childNodes)
-				: [node]),
-		);
+
+		return;
 	}
+
+	const node = createNode(value);
+
+	comment.replaceWith(
+		...(documentFragmentConstructor.test(node.constructor.name)
+			? Array.from(node.childNodes)
+			: [node]),
+	);
 }
