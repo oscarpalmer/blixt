@@ -1,5 +1,6 @@
-import {keyTypes} from '../data';
 import type {Key} from '../models';
+
+const keyTypes = new Set<string>(['number', 'string', 'symbol']);
 
 export function compareArrayOrder(
 	first: Key[],

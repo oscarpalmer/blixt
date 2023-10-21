@@ -1,7 +1,9 @@
-import {comment, templateData} from './data';
+import {comment} from './data';
 import {getString, isKey} from './helpers';
-import type {Key} from './models';
+import type {Key, TemplateData} from './models';
 import {createNodes, mapNodes} from './helpers/dom';
+
+const templateData = new WeakMap<Template, TemplateData>();
 
 export class Expression {
 	get value() {

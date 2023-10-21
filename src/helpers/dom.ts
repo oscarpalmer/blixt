@@ -1,11 +1,4 @@
-import {
-	blixt,
-	comment,
-	documentFragmentConstructor,
-	onAttributeExpression,
-	sourceAttributeNameExpression,
-	sourceAttributeValueExpression,
-} from '../data';
+import {blixt, comment} from '../data';
 import type {
 	ObservedItem,
 	TemplateData,
@@ -17,6 +10,14 @@ import {observeContent} from '../observer/content';
 import {Expression, Template} from '../template';
 import {addEvent} from './events';
 import {getString} from './index';
+
+const documentFragmentConstructor = /^documentfragment$/i;
+
+const onAttributeExpression = /^on/i;
+
+export const sourceAttributeNameExpression = /^(href|src|xlink:href)$/i;
+
+export const sourceAttributeValueExpression = /(data:text\/html|javascript:)/i;
 
 export function createNode(value: any): Node {
 	if (value instanceof Node) {

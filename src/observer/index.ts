@@ -1,6 +1,9 @@
-import {observers, proxies} from '../data';
+import {proxies} from '../data';
+import {getString} from '../helpers';
 import type {Data, Key, State, Store} from '../models';
-import {subscribe, unsubscribe} from '../store/subscription';
+import {subscribe, Subscription} from '../store/subscription';
+
+const observers = new Map<symbol, Map<Store<Data>, Set<string>>>();
 
 /**
  * Observes changes for properties used in a function
@@ -19,6 +22,7 @@ export function observe(callback: () => any, after?: (value: any) => any): any {
 
 	const hasAfter = typeof after === 'function';
 	const id = Symbol(undefined);
+	const subscriptions = new Set<Subscription>();
 
 	const queue = () => {
 		cancelAnimationFrame(frame!);
@@ -46,11 +50,11 @@ export function observe(callback: () => any, after?: (value: any) => any): any {
 		for (const [proxy, keys] of currentEntries) {
 			const newKeys = observed.get(proxy) ?? new Set();
 
-			const keysValues = Array.from(keys.values());
+			for (const subscription of subscriptions) {
+				if (keys.has(subscription.key) && !newKeys.has(subscription.key)) {
+					subscription.unsubscribe();
 
-			for (const key of keysValues) {
-				if (!newKeys.has(key)) {
-					unsubscribe(proxy, key, queue);
+					subscriptions.delete(subscription);
 				}
 			}
 		}
@@ -61,7 +65,13 @@ export function observe(callback: () => any, after?: (value: any) => any): any {
 			const keysValues = Array.from(keys.values());
 
 			for (const key of keysValues) {
-				subscribe(proxy, key, queue);
+				if (
+					!Array.from(subscriptions).some(
+						subscription => subscription.key === key,
+					)
+				) {
+					subscriptions.add(subscribe(proxy, key, queue));
+				}
 			}
 		}
 
@@ -75,15 +85,14 @@ export function observe(callback: () => any, after?: (value: any) => any): any {
 
 export function observeKey(state: State, key: Key): void {
 	const proxy = proxies.get(state)!;
-	const values = Array.from(observers.values());
 
-	for (const map of values) {
-		const keys = map.get(proxy as never);
+	for (const [_, data] of observers) {
+		const keys = data.get(proxy as never);
 
 		if (keys === undefined) {
-			map.set(proxy as never, new Set([key]));
+			data.set(proxy as never, new Set([getString(key)]));
 		} else {
-			keys.add(key);
+			keys.add(getString(key));
 		}
 	}
 }

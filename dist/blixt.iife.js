@@ -2,32 +2,12 @@ var Blixt = (function (exports) {
     'use strict';
 
     const blixt = 'blixt';
-    const booleanAttributes = new Set([
-        'checked',
-        'disabled',
-        'hidden',
-        'inert',
-        'multiple',
-        'open',
-        'readonly',
-        'required',
-        'selected',
-    ]);
-    const classAttributeExpression = /^class\./i;
-    const documentFragmentConstructor = /^documentfragment$/i;
     const comment = `<!--${blixt}-->`;
-    const keyTypes = new Set(['number', 'string', 'symbol']);
-    const observers = new Map();
-    const onAttributeExpression = /^on/i;
     const proxies = new WeakMap();
-    const sourceAttributeNameExpression = /^(href|src|xlink:href)$/i;
-    const sourceAttributeValueExpression = /(data:text\/html|javascript:)/i;
     const stateKey = '__state';
-    const styleAttributeExpression = /^style\./i;
     const subscriptions = new WeakMap();
-    const templateData = new WeakMap();
-    const valueAttributeExpression = /^value$/i;
 
+    const keyTypes = new Set(['number', 'string', 'symbol']);
     function compareArrayOrder(first, second) {
         const target = first.length > second.length ? second : first;
         if (!(first.length > second.length ? first : second)
@@ -69,6 +49,115 @@ var Blixt = (function (exports) {
     }
 
     class State {
+    }
+
+    class Subscription {
+        constructor(state, key, callback) {
+            if (!(state instanceof State)) {
+                throw new TypeError('Store must be a store');
+            }
+            if (!isKey(key)) {
+                throw new TypeError('Key must be a number, string, or symbol');
+            }
+            if (typeof callback !== 'function') {
+                throw new TypeError('Callback must be a function');
+            }
+            const keyAsString = getString(key);
+            this.callback = callback;
+            this.key = keyAsString;
+            this.state = state;
+            const stored = subscriptions.get(state);
+            const subs = stored.get(keyAsString);
+            if (subs === undefined) {
+                stored.set(keyAsString, new Set([callback]));
+            }
+            else if (!subs.has(callback)) {
+                subs.add(callback);
+            }
+        }
+        unsubscribe() {
+            const stored = subscriptions.get(this.state);
+            const subs = stored.get(this.key);
+            subs?.delete(this.callback);
+        }
+    }
+    /**
+     * Subscribes to value changes for a key in a store
+     * @template {Data} T
+     * @param {Store<T>} store
+     * @param {number|string|symbol} key
+     * @param {(newValue: any, oldValue?: any, origin?: string) => void} callback
+     * @returns {{unsubscribe(): void}}}
+     */
+    function subscribe(store, key, callback) {
+        return new Subscription(store?.[stateKey], key, callback);
+    }
+
+    const observers = new Map();
+    /**
+     * Observes changes for properties used in a function
+     * @param {() => any} callback
+     * @param {{(value: any) => any}=} after
+     * @returns {any}
+     */
+    function observe(callback, after) {
+        if (typeof callback !== 'function') {
+            throw new TypeError('Callback must be a function');
+        }
+        if (after !== undefined && typeof after !== 'function') {
+            throw new TypeError('After-callback must be a function');
+        }
+        const hasAfter = typeof after === 'function';
+        const id = Symbol(undefined);
+        const subscriptions = new Set();
+        const queue = () => {
+            cancelAnimationFrame(frame);
+            frame = requestAnimationFrame(() => {
+                frame = undefined;
+                run();
+            });
+        };
+        let current = observers.get(id) ?? new Map();
+        let frame;
+        function run() {
+            observers.set(id, new Map());
+            const value = callback();
+            const observed = observers.get(id) ?? new Map();
+            const currentEntries = Array.from(current.entries());
+            for (const [proxy, keys] of currentEntries) {
+                const newKeys = observed.get(proxy) ?? new Set();
+                for (const subscription of subscriptions) {
+                    if (keys.has(subscription.key) && !newKeys.has(subscription.key)) {
+                        subscription.unsubscribe();
+                        subscriptions.delete(subscription);
+                    }
+                }
+            }
+            const observedEntries = Array.from(observed.entries());
+            for (const [proxy, keys] of observedEntries) {
+                const keysValues = Array.from(keys.values());
+                for (const key of keysValues) {
+                    if (!Array.from(subscriptions).some(subscription => subscription.key === key)) {
+                        subscriptions.add(subscribe(proxy, key, queue));
+                    }
+                }
+            }
+            current = observed;
+            return hasAfter ? after(value) : value;
+        }
+        return run();
+    }
+    function observeKey(state, key) {
+        const proxy = proxies.get(state);
+        for (const [_, data] of observers) {
+            const keys = data.get(proxy);
+            if (keys === undefined) {
+                data.set(proxy, new Set([getString(key)]));
+            }
+            else {
+                keys.add(getString(key));
+            }
+        }
     }
 
     function createStore(data, state, prefix) {
@@ -237,116 +326,20 @@ var Blixt = (function (exports) {
             : value;
     }
 
-    /**
-     * Subscribes to value changes for a key in a store
-     * @template {Data} T
-     * @param {Store<T>} store
-     * @param {number|string|symbol} key
-     * @param {(newValue: any, oldValue?: any, origin?: string) => void} callback
-     * @returns {void}
-     */
-    function subscribe(store, key, callback) {
-        validate(store, key, callback);
-        const stored = subscriptions.get(store?.[stateKey]);
-        const keyAsString = getString(key);
-        const subscribers = stored.get(keyAsString);
-        if (subscribers === undefined) {
-            stored.set(keyAsString, new Set([callback]));
-        }
-        else if (!subscribers.has(callback)) {
-            subscribers.add(callback);
-        }
-    }
-    /**
-     * Unsubscribes from value changes for a key in a store
-     * @template {Data} T
-     * @param {Store<T>} store
-     * @param {number|string|symbol} key
-     * @param {(newValue: any, oldValue?: any, origin?: string) => void} callback
-     * @returns {void}
-     */
-    function unsubscribe(store, key, callback) {
-        validate(store, key, callback);
-        const stored = subscriptions.get(store?.[stateKey]);
-        const subscribers = stored?.get(String(key));
-        subscribers?.delete(callback);
-    }
-    function validate(store, key, callback) {
-        if (!isStore(store)) {
-            throw new TypeError('Store must be a store');
-        }
-        if (!isKey(key)) {
-            throw new TypeError('Key must be a number, string, or symbol');
-        }
-        if (typeof callback !== 'function') {
-            throw new TypeError('Callback must be a function');
-        }
-    }
-
-    /**
-     * Observes changes for properties used in a function
-     * @param {() => any} callback
-     * @param {{(value: any) => any}=} after
-     * @returns {any}
-     */
-    function observe(callback, after) {
-        if (typeof callback !== 'function') {
-            throw new TypeError('Callback must be a function');
-        }
-        if (after !== undefined && typeof after !== 'function') {
-            throw new TypeError('After-callback must be a function');
-        }
-        const hasAfter = typeof after === 'function';
-        const id = Symbol(undefined);
-        const queue = () => {
-            cancelAnimationFrame(frame);
-            frame = requestAnimationFrame(() => {
-                frame = undefined;
-                run();
-            });
-        };
-        let current = observers.get(id) ?? new Map();
-        let frame;
-        function run() {
-            observers.set(id, new Map());
-            const value = callback();
-            const observed = observers.get(id) ?? new Map();
-            const currentEntries = Array.from(current.entries());
-            for (const [proxy, keys] of currentEntries) {
-                const newKeys = observed.get(proxy) ?? new Set();
-                const keysValues = Array.from(keys.values());
-                for (const key of keysValues) {
-                    if (!newKeys.has(key)) {
-                        unsubscribe(proxy, key, queue);
-                    }
-                }
-            }
-            const observedEntries = Array.from(observed.entries());
-            for (const [proxy, keys] of observedEntries) {
-                const keysValues = Array.from(keys.values());
-                for (const key of keysValues) {
-                    subscribe(proxy, key, queue);
-                }
-            }
-            current = observed;
-            return hasAfter ? after(value) : value;
-        }
-        return run();
-    }
-    function observeKey(state, key) {
-        const proxy = proxies.get(state);
-        const values = Array.from(observers.values());
-        for (const map of values) {
-            const keys = map.get(proxy);
-            if (keys === undefined) {
-                map.set(proxy, new Set([key]));
-            }
-            else {
-                keys.add(key);
-            }
-        }
-    }
-
+    const booleanAttributes = new Set([
+        'checked',
+        'disabled',
+        'hidden',
+        'inert',
+        'multiple',
+        'open',
+        'readonly',
+        'required',
+        'selected',
+    ]);
+    const classAttributeExpression = /^class\./i;
+    const styleAttributeExpression = /^style\./i;
+    const valueAttributeExpression = /^value$/i;
     function observeAttribute(element, attribute, expression) {
         const { name } = attribute;
         const isBoolean = booleanAttributes.has(name.toLowerCase());
@@ -523,6 +516,10 @@ var Blixt = (function (exports) {
         };
     }
 
+    const documentFragmentConstructor = /^documentfragment$/i;
+    const onAttributeExpression = /^on/i;
+    const sourceAttributeNameExpression = /^(href|src|xlink:href)$/i;
+    const sourceAttributeValueExpression = /(data:text\/html|javascript:)/i;
     function createNode(value) {
         if (value instanceof Node) {
             return value;
@@ -625,6 +622,7 @@ var Blixt = (function (exports) {
             : [node]));
     }
 
+    const templateData = new WeakMap();
     class Expression {
         get value() {
             return this.callback;
@@ -722,7 +720,6 @@ var Blixt = (function (exports) {
     exports.store = store;
     exports.subscribe = subscribe;
     exports.template = template;
-    exports.unsubscribe = unsubscribe;
 
     return exports;
 

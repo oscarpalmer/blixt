@@ -1,11 +1,23 @@
-import {
-	booleanAttributes,
-	classAttributeExpression,
-	styleAttributeExpression,
-	valueAttributeExpression,
-} from '../data';
 import type {Expression} from '../template';
 import {observe} from './index';
+
+const booleanAttributes = new Set([
+	'checked',
+	'disabled',
+	'hidden',
+	'inert',
+	'multiple',
+	'open',
+	'readonly',
+	'required',
+	'selected',
+]);
+
+const classAttributeExpression = /^class\./i;
+
+const styleAttributeExpression = /^style\./i;
+
+const valueAttributeExpression = /^value$/i;
 
 export function observeAttribute(
 	element: HTMLElement | SVGElement,
