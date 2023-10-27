@@ -51,7 +51,11 @@ var Blixt = (function (exports) {
     class State {
     }
 
-    class Subscription {
+    const states$1 = new WeakMap();
+    class StoreSubscription {
+        get key() {
+            return states$1.get(this).key;
+        }
         constructor(state, key, callback) {
             if (!(state instanceof State)) {
                 throw new TypeError('Store must be a store');
@@ -63,9 +67,11 @@ var Blixt = (function (exports) {
                 throw new TypeError('Callback must be a function');
             }
             const keyAsString = getString(key);
-            this.callback = callback;
-            this.key = keyAsString;
-            this.state = state;
+            states$1.set(this, {
+                callback,
+                key: keyAsString,
+                value: state,
+            });
             const stored = subscriptions.get(state);
             const subs = stored.get(keyAsString);
             if (subs === undefined) {
@@ -75,30 +81,138 @@ var Blixt = (function (exports) {
                 subs.add(callback);
             }
         }
+        resubscribe() {
+            manage$1('add', this);
+        }
         unsubscribe() {
-            const stored = subscriptions.get(this.state);
-            const subs = stored.get(this.key);
-            subs?.delete(this.callback);
+            manage$1('remove', this);
+        }
+    }
+    function manage$1(type, subscription) {
+        const state = states$1.get(subscription);
+        if (state === undefined) {
+            return;
+        }
+        const stored = subscriptions.get(state.value);
+        const subscribers = stored?.get(subscription.key);
+        if (type === 'add' &&
+            subscribers !== undefined &&
+            !subscribers.has(state.callback)) {
+            subscribers.add(state.callback);
+        }
+        else if (type === 'remove') {
+            subscribers?.delete(state.callback);
         }
     }
     /**
-     * Subscribes to value changes for a key in a store
+     * - Subscribes to value changes for a key in a store
+     * - Returns a subscription that can be unsubscribed and resubscribed as needed
      * @template {Data} T
      * @param {Store<T>} store
      * @param {number|string|symbol} key
      * @param {(newValue: any, oldValue?: any, origin?: string) => void} callback
-     * @returns {{unsubscribe(): void}}}
+     * @returns {StoreSubscription}
      */
     function subscribe(store, key, callback) {
-        return new Subscription(store?.[stateKey], key, callback);
+        return new StoreSubscription(store?.[stateKey], key, callback);
     }
 
+    const observables = new WeakMap();
     const observers = new Map();
+    const parents = new WeakMap();
+    const states = new WeakMap();
+    class Observable {
+        constructor(callback) {
+            this.callback = callback;
+            this.subscriptions = new Set();
+            this.id = Symbol(undefined);
+            this.observed = new Map();
+            this.onQueue = this.queue.bind(this);
+        }
+        subscribe(callback) {
+            const subscription = new ObservableSubscription(this, callback);
+            this.subscriptions.add(subscription);
+            return subscription;
+        }
+        run() {
+            observers.set(this.id, new Map());
+            const value = this.callback();
+            const observed = observers.get(this.id) ?? new Map();
+            for (const subscription of this.subscriptions) {
+                const state = states.get(subscription);
+                if (state === undefined || !state.active) {
+                    continue;
+                }
+                for (const [proxy, keys] of this.observed) {
+                    const newKeys = observed.get(proxy) ?? new Set();
+                    for (const storeSubscription of state.subscriptions) {
+                        if (keys.has(storeSubscription.key) &&
+                            !newKeys.has(storeSubscription.key)) {
+                            storeSubscription.unsubscribe();
+                            state.subscriptions.delete(storeSubscription);
+                        }
+                    }
+                }
+                for (const [proxy, keys] of observed) {
+                    for (const key of keys) {
+                        if (!Array.from(state.subscriptions).some(storeSubscription => storeSubscription.key === key)) {
+                            state.subscriptions.add(new StoreSubscription(proxy[stateKey], key, this.onQueue));
+                        }
+                    }
+                }
+                state.after(value);
+            }
+            this.observed = observed;
+        }
+        queue() {
+            cancelAnimationFrame(this.frame);
+            this.frame = requestAnimationFrame(() => {
+                this.frame = undefined;
+                this.run();
+            });
+        }
+    }
     /**
-     * Observes changes for properties used in a function
+     * A subscription to an observed function, which can be unsubscribed and resubscribed as needed.
+     */
+    class ObservableSubscription {
+        constructor(observable, after) {
+            parents.set(this, observable);
+            states.set(this, {
+                after,
+                active: true,
+                subscriptions: new Set(),
+            });
+        }
+        resubscribe() {
+            manage('add', this);
+        }
+        unsubscribe() {
+            manage('remove', this);
+        }
+    }
+    function manage(type, subscription) {
+        const add = type === 'add';
+        const parent = parents.get(subscription);
+        const state = states.get(subscription);
+        if (parent === undefined || state === undefined || state.active === add) {
+            return;
+        }
+        state.active = add;
+        for (const storeSubscription of state.subscriptions) {
+            storeSubscription[add ? 'resubscribe' : 'unsubscribe']();
+        }
+        parent.subscriptions[add ? 'add' : 'delete'](subscription);
+        if (add) {
+            parent.run();
+        }
+    }
+    /**
+     * - Observes changes for properties used in a function
+     * - Returns a subscription that can be unsubscribed and resubscribed as needed
      * @param {() => any} callback
      * @param {{(value: any) => any}=} after
-     * @returns {any}
+     * @returns {ObservableSubscription}
      */
     function observe(callback, after) {
         if (typeof callback !== 'function') {
@@ -107,45 +221,14 @@ var Blixt = (function (exports) {
         if (after !== undefined && typeof after !== 'function') {
             throw new TypeError('After-callback must be a function');
         }
-        const hasAfter = typeof after === 'function';
-        const id = Symbol(undefined);
-        const subscriptions = new Set();
-        const queue = () => {
-            cancelAnimationFrame(frame);
-            frame = requestAnimationFrame(() => {
-                frame = undefined;
-                run();
-            });
-        };
-        let current = observers.get(id) ?? new Map();
-        let frame;
-        function run() {
-            observers.set(id, new Map());
-            const value = callback();
-            const observed = observers.get(id) ?? new Map();
-            const currentEntries = Array.from(current.entries());
-            for (const [proxy, keys] of currentEntries) {
-                const newKeys = observed.get(proxy) ?? new Set();
-                for (const subscription of subscriptions) {
-                    if (keys.has(subscription.key) && !newKeys.has(subscription.key)) {
-                        subscription.unsubscribe();
-                        subscriptions.delete(subscription);
-                    }
-                }
-            }
-            const observedEntries = Array.from(observed.entries());
-            for (const [proxy, keys] of observedEntries) {
-                const keysValues = Array.from(keys.values());
-                for (const key of keysValues) {
-                    if (!Array.from(subscriptions).some(subscription => subscription.key === key)) {
-                        subscriptions.add(subscribe(proxy, key, queue));
-                    }
-                }
-            }
-            current = observed;
-            return hasAfter ? after(value) : value;
+        let observable = observables.get(callback);
+        if (observable === undefined) {
+            observable = new Observable(callback);
+            observables.set(callback, observable);
         }
-        return run();
+        const subscription = observable.subscribe(after);
+        observable.run();
+        return subscription;
     }
     function observeKey(state, key) {
         const proxy = proxies.get(state);
@@ -293,9 +376,6 @@ var Blixt = (function (exports) {
             }
         }
     }
-    /**
-     * Is the value a reactive store?
-     */
     function isStore(value) {
         return value?.[stateKey] instanceof State;
     }
@@ -714,8 +794,6 @@ var Blixt = (function (exports) {
         return html;
     }
 
-    exports.Template = Template;
-    exports.isStore = isStore;
     exports.observe = observe;
     exports.store = store;
     exports.subscribe = subscribe;

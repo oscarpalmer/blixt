@@ -3,10 +3,18 @@ import {getString, isKey} from '../helpers';
 import type {Data, Key, Store, Subscriber} from '../models';
 import {State} from '../models';
 
-export class Subscription implements Subscription {
-	readonly callback: Subscriber;
-	readonly key: string;
-	readonly state: State;
+type SubscriptionState = {
+	callback: Subscriber;
+	key: string;
+	value: State;
+};
+
+const states = new WeakMap<StoreSubscription, SubscriptionState>();
+
+export class StoreSubscription {
+	get key(): string {
+		return states.get(this)!.key;
+	}
 
 	constructor(state: State, key: Key, callback: Subscriber) {
 		if (!(state instanceof State)) {
@@ -23,9 +31,11 @@ export class Subscription implements Subscription {
 
 		const keyAsString = getString(key);
 
-		this.callback = callback;
-		this.key = keyAsString;
-		this.state = state;
+		states.set(this, {
+			callback,
+			key: keyAsString,
+			value: state,
+		});
 
 		const stored = subscriptions.get(state)!;
 		const subs = stored.get(keyAsString);
@@ -37,26 +47,49 @@ export class Subscription implements Subscription {
 		}
 	}
 
-	unsubscribe(): void {
-		const stored = subscriptions.get(this.state)!;
-		const subs = stored.get(this.key);
+	resubscribe(): void {
+		manage('add', this);
+	}
 
-		subs?.delete(this.callback);
+	unsubscribe(): void {
+		manage('remove', this);
+	}
+}
+
+function manage(type: 'add' | 'remove', subscription: StoreSubscription): void {
+	const state = states.get(subscription);
+
+	if (state === undefined) {
+		return;
+	}
+
+	const stored = subscriptions.get(state.value);
+	const subscribers = stored?.get(subscription.key);
+
+	if (
+		type === 'add' &&
+		subscribers !== undefined &&
+		!subscribers.has(state.callback)
+	) {
+		subscribers.add(state.callback);
+	} else if (type === 'remove') {
+		subscribers?.delete(state.callback);
 	}
 }
 
 /**
- * Subscribes to value changes for a key in a store
+ * - Subscribes to value changes for a key in a store
+ * - Returns a subscription that can be unsubscribed and resubscribed as needed
  * @template {Data} T
  * @param {Store<T>} store
  * @param {number|string|symbol} key
  * @param {(newValue: any, oldValue?: any, origin?: string) => void} callback
- * @returns {{unsubscribe(): void}}}
+ * @returns {StoreSubscription}
  */
 export function subscribe<T extends Data>(
 	store: Store<T>,
 	key: Key,
 	callback: Subscriber,
-): Subscription {
-	return new Subscription(store?.[stateKey] as State, key, callback);
+): StoreSubscription {
+	return new StoreSubscription(store?.[stateKey] as State, key, callback);
 }

@@ -206,10 +206,7 @@ function handleArray(parameters: HandleArrayParameters): unknown {
 	}
 }
 
-/**
- * Is the value a reactive store?
- */
-export function isStore(value: any): boolean {
+function isStore(value: any): boolean {
 	return (value as Record<string, any>)?.[stateKey] instanceof State;
 }
 

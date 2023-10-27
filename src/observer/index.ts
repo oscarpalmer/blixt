@@ -1,17 +1,162 @@
-import {proxies} from '../data';
+import {proxies, stateKey} from '../data';
 import {getString} from '../helpers';
 import type {Data, Key, State, Store} from '../models';
-import {subscribe, Subscription} from '../store/subscription';
+import {StoreSubscription} from '../store/subscription';
 
+type ObservableSubscriptionState = {
+	active: boolean;
+	after: (value: any) => any;
+	subscriptions: Set<StoreSubscription>;
+};
+
+const observables = new WeakMap<() => any, Observable>();
 const observers = new Map<symbol, Map<Store<Data>, Set<string>>>();
+const parents = new WeakMap<ObservableSubscription, Observable>();
+
+const states = new WeakMap<
+	ObservableSubscription,
+	ObservableSubscriptionState
+>();
+
+export class Observable {
+	readonly subscriptions = new Set<ObservableSubscription>();
+
+	private frame: number | undefined;
+	private readonly id = Symbol(undefined);
+	private observed = new Map<Store<Data>, Set<Key>>();
+	private readonly onQueue = this.queue.bind(this);
+
+	constructor(private readonly callback: () => any) {}
+
+	subscribe(callback: (value: any) => any): ObservableSubscription {
+		const subscription = new ObservableSubscription(this, callback);
+
+		this.subscriptions.add(subscription);
+
+		return subscription;
+	}
+
+	run(): void {
+		observers.set(this.id, new Map());
+
+		const value = this.callback() as unknown;
+
+		const observed = observers.get(this.id) ?? new Map<Store<Data>, Set<Key>>();
+
+		for (const subscription of this.subscriptions) {
+			const state = states.get(subscription)!;
+
+			if (state === undefined || !state.active) {
+				continue;
+			}
+
+			for (const [proxy, keys] of this.observed) {
+				const newKeys = observed.get(proxy) ?? new Set();
+
+				for (const storeSubscription of state.subscriptions) {
+					if (
+						keys.has(storeSubscription.key) &&
+						!newKeys.has(storeSubscription.key)
+					) {
+						storeSubscription.unsubscribe();
+
+						state.subscriptions.delete(storeSubscription);
+					}
+				}
+			}
+
+			for (const [proxy, keys] of observed) {
+				for (const key of keys) {
+					if (
+						!Array.from(state.subscriptions).some(
+							storeSubscription => storeSubscription.key === key,
+						)
+					) {
+						state.subscriptions.add(
+							new StoreSubscription(
+								proxy[stateKey] as State,
+								key,
+								this.onQueue,
+							),
+						);
+					}
+				}
+			}
+
+			state.after(value);
+		}
+
+		this.observed = observed;
+	}
+
+	private queue(): void {
+		cancelAnimationFrame(this.frame!);
+
+		this.frame = requestAnimationFrame(() => {
+			this.frame = undefined;
+
+			this.run();
+		});
+	}
+}
 
 /**
- * Observes changes for properties used in a function
+ * A subscription to an observed function, which can be unsubscribed and resubscribed as needed.
+ */
+export class ObservableSubscription {
+	constructor(observable: Observable, after: (value: any) => any) {
+		parents.set(this, observable);
+
+		states.set(this, {
+			after,
+			active: true,
+			subscriptions: new Set(),
+		});
+	}
+
+	resubscribe(): void {
+		manage('add', this);
+	}
+
+	unsubscribe(): void {
+		manage('remove', this);
+	}
+}
+
+function manage(type: 'add' | 'remove', subscription: ObservableSubscription) {
+	const add = type === 'add';
+
+	const parent = parents.get(subscription);
+	const state = states.get(subscription);
+
+	if (parent === undefined || state === undefined || state.active === add) {
+		return;
+	}
+
+	state.active = add;
+
+	for (const storeSubscription of state.subscriptions) {
+		storeSubscription[add ? 'resubscribe' : 'unsubscribe']();
+	}
+
+	parent.subscriptions[add ? 'add' : 'delete'](subscription);
+
+	if (add) {
+		parent.run();
+	}
+}
+
+/**
+ * - Observes changes for properties used in a function
+ * - Returns a subscription that can be unsubscribed and resubscribed as needed
  * @param {() => any} callback
  * @param {{(value: any) => any}=} after
- * @returns {any}
+ * @returns {ObservableSubscription}
  */
-export function observe(callback: () => any, after?: (value: any) => any): any {
+export function observe(
+	callback: () => any,
+	after: (value: any) => any,
+): ObservableSubscription {
 	if (typeof callback !== 'function') {
 		throw new TypeError('Callback must be a function');
 	}
@@ -20,67 +165,19 @@ export function observe(callback: () => any, after?: (value: any) => any): any {
 		throw new TypeError('After-callback must be a function');
 	}
 
-	const hasAfter = typeof after === 'function';
-	const id = Symbol(undefined);
-	const subscriptions = new Set<Subscription>();
+	let observable = observables.get(callback);
 
-	const queue = () => {
-		cancelAnimationFrame(frame!);
+	if (observable === undefined) {
+		observable = new Observable(callback);
 
-		frame = requestAnimationFrame(() => {
-			frame = undefined;
-
-			run();
-		});
-	};
-
-	let current = observers.get(id) ?? new Map<Store<Data>, Set<Key>>();
-
-	let frame: number | undefined;
-
-	function run(): any {
-		observers.set(id, new Map());
-
-		const value = callback() as never;
-
-		const observed = observers.get(id) ?? new Map<Store<Data>, Set<Key>>();
-
-		const currentEntries = Array.from(current.entries());
-
-		for (const [proxy, keys] of currentEntries) {
-			const newKeys = observed.get(proxy) ?? new Set();
-
-			for (const subscription of subscriptions) {
-				if (keys.has(subscription.key) && !newKeys.has(subscription.key)) {
-					subscription.unsubscribe();
-
-					subscriptions.delete(subscription);
-				}
-			}
-		}
-
-		const observedEntries = Array.from(observed.entries());
-
-		for (const [proxy, keys] of observedEntries) {
-			const keysValues = Array.from(keys.values());
-
-			for (const key of keysValues) {
-				if (
-					!Array.from(subscriptions).some(
-						subscription => subscription.key === key,
-					)
-				) {
-					subscriptions.add(subscribe(proxy, key, queue));
-				}
-			}
-		}
-
-		current = observed;
-
-		return hasAfter ? after(value) : value;
+		observables.set(callback, observable);
 	}
 
-	return run();
+	const subscription = observable.subscribe(after);
+
+	observable.run();
+
+	return subscription;
 }
 
 export function observeKey(state: State, key: Key): void {
