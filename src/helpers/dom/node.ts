@@ -6,6 +6,8 @@ import type {
 import {
 	blixt,
 	documentFragmentConstructor,
+	hydratableAttributes,
+	hydratableEvents,
 	nodeSubscriptions,
 } from '../../data';
 import {observeContent} from '../../observer/content';
@@ -14,20 +16,25 @@ import {getString} from '../index';
 import {removeEvents} from '../events';
 import {mapAttributes} from './attribute';
 
-export function cleanNodes(nodes: Node[]): void {
+export function cleanNodes(nodes: Node[], removeSubscriptions: boolean): void {
 	for (const node of nodes) {
-		const subscriptions = nodeSubscriptions.get(node) ?? [];
-
-		for (const subscription of subscriptions) {
-			subscription.unsubscribe();
-		}
-
-		nodeSubscriptions.delete(node);
+		hydratableAttributes.delete(node as never);
+		hydratableEvents.delete(node as never);
 
 		removeEvents(node);
 
+		if (removeSubscriptions) {
+			const subscriptions = nodeSubscriptions.get(node) ?? [];
+
+			for (const subscription of subscriptions) {
+				subscription.unsubscribe();
+			}
+
+			nodeSubscriptions.delete(node);
+		}
+
 		if (node.hasChildNodes()) {
-			cleanNodes(Array.from(node.childNodes));
+			cleanNodes(Array.from(node.childNodes), removeSubscriptions);
 		}
 	}
 }
@@ -97,7 +104,7 @@ export function replaceNodes(
 ): ObservedItem[] | undefined {
 	const nodes = (from ?? []).flatMap(item => item.nodes);
 
-	cleanNodes(nodes);
+	cleanNodes(nodes, true);
 
 	for (const node of nodes) {
 		if (nodes.indexOf(node) === 0) {

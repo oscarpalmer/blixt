@@ -1,11 +1,11 @@
 import {expect, test} from 'bun:test';
 import {template, Template} from '../../src/template';
+import {getObservedItems} from '../../src/helpers/dom';
 import {
 	createNode,
 	createNodes,
-	getObservedItems,
 	replaceNodes,
-} from '../../src/helpers/dom';
+} from '../../src/helpers/dom/node';
 
 test('createNode:text', () => {
 	const text = createNode('test');

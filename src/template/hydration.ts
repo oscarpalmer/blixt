@@ -1,0 +1,130 @@
+import type {NodePair} from '../models';
+import {
+	hydratableAttributes,
+	hydratableEvents,
+	nodeSubscriptions,
+	storeSubscriptions,
+} from '../data';
+import {cleanNodes} from '../helpers/dom/node';
+import {addEvent} from '../helpers/events';
+import {observeAttribute} from '../observer/attribute';
+import type {Expression, Template} from './index';
+import {render} from './index';
+
+function compareNode(first: Node, second: Node, pairs: NodePair[]): boolean {
+	const firstChildren = Array.from(first.childNodes).filter(child =>
+		isValidNode(child),
+	);
+
+	const secondChildren = Array.from(second.childNodes).filter(child =>
+		isValidNode(child),
+	);
+
+	const {length} = firstChildren;
+
+	if (length !== secondChildren.length) {
+		console.warn('Nodes do not have same number of children');
+
+		return false;
+	}
+
+	if (length === 0) {
+		const valid = first.isEqualNode(second);
+
+		if (valid) {
+			pairs.push({first, second});
+		} else {
+			console.warn('Nodes are not equal');
+		}
+
+		return valid;
+	}
+
+	for (let index = 0; index < length; index += 1) {
+		if (!compareNode(firstChildren[index], secondChildren[index], pairs)) {
+			return false;
+		}
+	}
+
+	pairs.push({first, second});
+
+	return true;
+}
+
+export function hydrate(
+	node: Node,
+	template: Template,
+	callback?: (node: Node) => void,
+): Node {
+	const rendered = render(template);
+
+	const pairs: NodePair[] = [];
+
+	if (
+		normaliseContent(node) !== normaliseContent(rendered) ||
+		!compareNode(node, rendered, pairs)
+	) {
+		console.warn('Unable to hydrate existing content');
+
+		return node;
+	}
+
+	for (const pair of pairs) {
+		if (pair.first instanceof HTMLElement || pair.first instanceof SVGElement) {
+			hydrateElement(pair.first, pair.second as never);
+		}
+	}
+
+	cleanNodes([rendered], false);
+
+	if (typeof callback === 'function') {
+		callback(node);
+	}
+
+	return node;
+}
+
+function hydrateElement(
+	existing: HTMLElement | SVGElement,
+	templated: HTMLElement | SVGElement,
+): void {
+	const attributes =
+		hydratableAttributes.get(templated) ?? new Map<string, Set<Expression>>();
+
+	for (const [name, expressions] of attributes) {
+		for (const expression of expressions) {
+			observeAttribute(existing, name, expression);
+		}
+	}
+
+	const events =
+		hydratableEvents.get(templated) ?? new Map<string, Set<Expression>>();
+
+	for (const [name, expressions] of events) {
+		for (const expression of expressions) {
+			addEvent(existing, name, expression);
+		}
+	}
+
+	const subscriptions = nodeSubscriptions.get(templated) ?? new Set();
+
+	if (subscriptions.size > 0) {
+		nodeSubscriptions.set(existing, subscriptions);
+	}
+
+	nodeSubscriptions.delete(templated);
+
+	hydratableEvents.delete(templated);
+}
+
+function isValidNode(node: Node): boolean {
+	if (node instanceof Text) {
+		return (node?.textContent ?? '').trim().length > 0;
+	}
+
+	return node instanceof Element ? !/^script$/i.test(node.tagName) : true;
+}
+
+function normaliseContent(node: Node): string {
+	return (node?.textContent ?? '').replaceAll(/\s+/g, ' ').trim();
+}

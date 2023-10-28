@@ -1,9 +1,8 @@
-import {comment} from './data';
-import {getString, isKey} from './helpers';
-import type {Key, TemplateData} from './models';
-import {createNodes, mapNodes} from './helpers/dom/node';
-
-const templateData = new WeakMap<Template, TemplateData>();
+import type {Key} from '../models';
+import {comment, templateData} from '../data';
+import {getString, isKey} from '../helpers';
+import {createNodes, mapNodes} from '../helpers/dom/node';
+import {hydrate} from './hydration';
 
 export class Expression {
 	get value() {
@@ -41,6 +40,18 @@ export class Template {
 	}
 
 	/**
+	 * - Hydrates an existing node using the template and all its expressions
+	 * - If a callback is provided, it will be called after the node has been successfully hydrated
+	 *
+	 * @param {Node} node
+	 * @param {((node: Node) => void)=} callback
+	 * @returns {Node}
+	 */
+	hydrate(node: Node, callback: ((node: Node) => void) | undefined): Node {
+		return hydrate(node, this, callback);
+	}
+
+	/**
 	 * Sets the template's ID to uniquely identify it in a list of templates
 	 * @param {number|string|symbol} key
 	 * @returns {Template}
@@ -59,14 +70,19 @@ export class Template {
 	 * @returns {Node}
 	 */
 	render(parent?: ParentNode): Node {
-		const asString = toString(this);
-		const nodes = createNodes(asString);
-		const mapped = mapNodes(templateData, this, nodes);
+		const rendered = render(this);
 
-		parent?.append(mapped);
+		parent?.append(rendered);
 
-		return parent ?? mapped;
+		return parent ?? rendered;
 	}
+}
+
+export function render(template: Template): Node {
+	const asString = toString(template);
+	const nodes = createNodes(asString);
+
+	return mapNodes(templateData, template, nodes);
 }
 
 /**
@@ -76,7 +92,7 @@ export function template(strings: TemplateStringsArray, ...expressions: any[]) {
 	return new Template(strings, expressions);
 }
 
-function toString(template: Template): string {
+export function toString(template: Template): string {
 	const {strings, expressions} = templateData.get(template)!;
 
 	function express(value: string, expression: any): string {

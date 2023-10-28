@@ -47,8 +47,8 @@ test('addEvent & removeEvent', () => {
 	button.setAttribute(clickAttribute.name, '');
 	button.setAttribute(focusAttribute.name, '');
 
-	addEvent(button, clickAttribute, expression);
-	addEvent(button, focusAttribute, expression);
+	addEvent(button, clickAttribute.name, expression);
+	addEvent(button, focusAttribute.name, expression);
 
 	expect(button.getAttribute('@click')).toEqual(null);
 	expect(button.getAttribute('@focus')).toEqual(null);

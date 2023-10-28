@@ -3,10 +3,14 @@ var Blixt = (function (exports) {
 
     const blixt = 'blixt';
     const comment = '<!--blixt-->';
+    const documentFragmentConstructor = /^documentfragment$/i;
+    const hydratableAttributes = new WeakMap();
+    const hydratableEvents = new WeakMap();
     const nodeSubscriptions = new WeakMap();
     const proxies = new WeakMap();
     const stateKey = '__state';
     const storeSubscriptions = new WeakMap();
+    const templateData = new WeakMap();
 
     const keyTypes = new Set(['number', 'string', 'symbol']);
     function compareArrayOrder(first, second) {
@@ -35,9 +39,6 @@ var Blixt = (function (exports) {
         const parts = key.split('.');
         let value = data;
         for (const part of parts) {
-            if (value === undefined) {
-                return undefined;
-            }
             value = value?.[part];
         }
         return value;
@@ -47,6 +48,21 @@ var Blixt = (function (exports) {
     }
     function isKey(value) {
         return keyTypes.has(typeof value);
+    }
+    function storeAttributeOrEvent(store, node, name, value) {
+        const nodeEvents = store.get(node);
+        if (nodeEvents === undefined) {
+            store.set(node, new Map([[name, new Set([value])]]));
+        }
+        else {
+            const namedEvents = nodeEvents.get(name);
+            if (namedEvents === undefined) {
+                nodeEvents.set(name, new Set([value]));
+            }
+            else {
+                namedEvents.add(value);
+            }
+        }
     }
     function storeSubscription(element, subscription) {
         const subscriptions = nodeSubscriptions.get(element);
@@ -419,102 +435,20 @@ var Blixt = (function (exports) {
             : value;
     }
 
-    const booleanAttributes = new Set([
-        'checked',
-        'disabled',
-        'hidden',
-        'inert',
-        'multiple',
-        'open',
-        'readonly',
-        'required',
-        'selected',
-    ]);
-    const classAttributeExpression = /^class\./i;
-    const styleAttributeExpression = /^style\./i;
-    const valueAttributeExpression = /^value$/i;
-    function observeAttribute(element, attribute, expression) {
-        const { name } = attribute;
-        const isBoolean = booleanAttributes.has(name.toLowerCase());
-        const isClass = classAttributeExpression.test(name);
-        const isStyle = styleAttributeExpression.test(name);
-        if (isBoolean || isClass || isStyle) {
-            element.removeAttribute(name);
-        }
-        let subscription;
-        if (isBoolean) {
-            subscription = observeBooleanAttribute(element, name, expression);
-        }
-        else if (isClass) {
-            subscription = observeClassAttribute(element, name, expression);
-        }
-        else if (isStyle) {
-            subscription = observeStyleAttribute(element, name, expression);
-        }
-        else {
-            subscription = observeValueAttribute(element, name, expression);
-        }
-        if (subscription !== undefined) {
-            storeSubscription(element, subscription);
-        }
+    function getObservedItem(value) {
+        return {
+            identifier: value instanceof Template ? value.id : undefined,
+            nodes: getObservedItems(createNode(value)).flatMap(item => item.nodes),
+        };
     }
-    function observeBooleanAttribute(element, name, expression) {
-        return observe(expression.value, (value) => {
-            if (typeof value === 'boolean') {
-                element[name] = value;
-            }
-        });
-    }
-    function observeClassAttribute(element, name, expression) {
-        const classes = name
-            .split('.')
-            .slice(1)
-            .map(name => name.trim())
-            .filter(name => name.length > 0);
-        if (classes.length === 0) {
-            return;
-        }
-        return observe(expression.value, (value) => {
-            if (value === true) {
-                element.classList.add(...classes);
-            }
-            else {
-                element.classList.remove(...classes);
-            }
-        });
-    }
-    function observeStyleAttribute(element, name, expression) {
-        const [, first, second] = name.split('.');
-        const property = first.trim();
-        const suffix = second?.trim();
-        if (property.length === 0 || (suffix !== undefined && suffix.length === 0)) {
-            return;
-        }
-        return observe(expression.value, (value) => {
-            if (value === undefined ||
-                value === null ||
-                value === false ||
-                (value === true && suffix === undefined)) {
-                element.style.removeProperty(property);
-            }
-            else {
-                element.style.setProperty(property, value === true ? suffix : `${value}${suffix ?? ''}`);
-            }
-        });
-    }
-    function observeValueAttribute(element, name, expression) {
-        const isValueAttribute = valueAttributeExpression.test(name);
-        return observe(expression.value, (value) => {
-            if (isValueAttribute) {
-                element.value = value;
-            }
-            if (value === undefined || value === null) {
-                element.removeAttribute(name);
-            }
-            else {
-                element.setAttribute(name, value);
-            }
-        });
+    function getObservedItems(value) {
+        const array = Array.isArray(value) ? value : [value];
+        return array
+            .filter(item => item instanceof Node)
+            .map(item => documentFragmentConstructor.test(item.constructor.name)
+            ? Array.from(item.childNodes)
+            : [item])
+            .map(items => ({ nodes: items }));
     }
 
     function observeContent(comment, expression) {
@@ -583,7 +517,7 @@ var Blixt = (function (exports) {
         const nodes = current
             .filter(item => !identifiers.includes(item.identifier))
             .flatMap(item => item.nodes);
-        cleanNodes(nodes);
+        cleanNodes(nodes, true);
         for (const node of nodes) {
             node.remove();
         }
@@ -592,22 +526,11 @@ var Blixt = (function (exports) {
 
     const events = new WeakMap();
     function addEvent(element, attribute, expression) {
-        const { name, options } = getEventParameters(attribute.name);
+        const { name, options } = getEventParameters(attribute);
         element.addEventListener(name, expression.value, options);
-        element.removeAttribute(attribute.name);
-        const elementEvents = events.get(element);
-        if (elementEvents === undefined) {
-            events.set(element, new Map([[name, new Set([{ expression, options }])]]));
-        }
-        else {
-            const namedEvents = elementEvents.get(name);
-            if (namedEvents === undefined) {
-                elementEvents.set(name, new Set([{ expression, options }]));
-            }
-            else {
-                namedEvents.add({ expression, options });
-            }
-        }
+        element.removeAttribute(attribute);
+        storeAttributeOrEvent(events, element, name, { expression, options });
+        storeAttributeOrEvent(hydratableEvents, element, attribute, expression);
     }
     function getEventParameters(attribute) {
         let name = attribute.slice(1);
@@ -640,57 +563,109 @@ var Blixt = (function (exports) {
         events.delete(element);
     }
 
-    const documentFragmentConstructor = /^documentfragment$/i;
+    const booleanAttributes = new Set([
+        'checked',
+        'disabled',
+        'hidden',
+        'inert',
+        'multiple',
+        'open',
+        'readonly',
+        'required',
+        'selected',
+    ]);
+    const classAttributeExpression = /^class\./i;
+    const styleAttributeExpression = /^style\./i;
+    const valueAttributeExpression = /^value$/i;
+    function observeAttribute(element, attribute, expression) {
+        const isBoolean = booleanAttributes.has(attribute.toLowerCase());
+        const isClass = classAttributeExpression.test(attribute);
+        const isStyle = styleAttributeExpression.test(attribute);
+        if (isBoolean || isClass || isStyle) {
+            element.removeAttribute(attribute);
+        }
+        let subscription;
+        if (isBoolean) {
+            subscription = observeBooleanAttribute(element, attribute, expression);
+        }
+        else if (isClass) {
+            subscription = observeClassAttribute(element, attribute, expression);
+        }
+        else if (isStyle) {
+            subscription = observeStyleAttribute(element, attribute, expression);
+        }
+        else {
+            subscription = observeValueAttribute(element, attribute, expression);
+        }
+        if (subscription === undefined) {
+            return;
+        }
+        storeAttributeOrEvent(hydratableAttributes, element, attribute, expression);
+        storeSubscription(element, subscription);
+    }
+    function observeBooleanAttribute(element, name, expression) {
+        return observe(expression.value, (value) => {
+            const isBoolean = typeof value === 'boolean';
+            if (value === undefined || value === null || isBoolean) {
+                element[name] = isBoolean ? value : false;
+            }
+        });
+    }
+    function observeClassAttribute(element, name, expression) {
+        const classes = name
+            .split('.')
+            .slice(1)
+            .map(name => name.trim())
+            .filter(name => name.length > 0);
+        if (classes.length === 0) {
+            return;
+        }
+        return observe(expression.value, (value) => {
+            if (value === true) {
+                element.classList.add(...classes);
+            }
+            else {
+                element.classList.remove(...classes);
+            }
+        });
+    }
+    function observeStyleAttribute(element, name, expression) {
+        const [, first, second] = name.split('.');
+        const property = first.trim();
+        const suffix = second?.trim();
+        if (property.length === 0 || (suffix !== undefined && suffix.length === 0)) {
+            return;
+        }
+        return observe(expression.value, (value) => {
+            if (value === undefined ||
+                value === null ||
+                value === false ||
+                (value === true && suffix === undefined)) {
+                element.style.removeProperty(property);
+            }
+            else {
+                element.style.setProperty(property, value === true ? suffix : `${value}${suffix ?? ''}`);
+            }
+        });
+    }
+    function observeValueAttribute(element, name, expression) {
+        const isValueAttribute = valueAttributeExpression.test(name);
+        return observe(expression.value, (value) => {
+            if (isValueAttribute) {
+                element.value = value;
+            }
+            if (value === undefined || value === null) {
+                element.removeAttribute(name);
+            }
+            else {
+                element.setAttribute(name, value);
+            }
+        });
+    }
+
     const onAttributeExpression = /^on/i;
     const sourceAttributeNameExpression = /^(href|src|xlink:href)$/i;
     const sourceAttributeValueExpression = /(data:text\/html|javascript:)/i;
-    function cleanNodes(nodes) {
-        for (const node of nodes) {
-            const subscriptions = nodeSubscriptions.get(node) ?? [];
-            for (const subscription of subscriptions) {
-                subscription.unsubscribe();
-            }
-            nodeSubscriptions.delete(node);
-            removeEvents(node);
-            if (node.hasChildNodes()) {
-                cleanNodes(Array.from(node.childNodes));
-            }
-        }
-    }
-    function createNode(value) {
-        if (value instanceof Node) {
-            return value;
-        }
-        return value instanceof Template
-            ? value.render()
-            : document.createTextNode(getString(value));
-    }
-    function createNodes(html) {
-        const element = document.createElement('template');
-        element.innerHTML = html;
-        const fragment = element.content.cloneNode(true);
-        const scripts = Array.from(fragment.querySelectorAll('script'));
-        for (const script of scripts) {
-            script.remove();
-        }
-        fragment.normalize();
-        return fragment;
-    }
-    function getObservedItem(value) {
-        return {
-            identifier: value instanceof Template ? value.id : undefined,
-            nodes: getObservedItems(createNode(value)).flatMap(item => item.nodes),
-        };
-    }
-    function getObservedItems(value) {
-        const array = Array.isArray(value) ? value : [value];
-        return array
-            .filter(item => item instanceof Node)
-            .map(item => documentFragmentConstructor.test(item.constructor.name)
-            ? Array.from(item.childNodes)
-            : [item])
-            .map(items => ({ nodes: items }));
-    }
     function isBadAttribute(attribute) {
         const { name, value } = attribute;
         if (onAttributeExpression.test(name)) {
@@ -714,12 +689,49 @@ var Blixt = (function (exports) {
                 continue;
             }
             if (name.startsWith('@')) {
-                addEvent(element, attribute, expression);
+                addEvent(element, attribute.name, expression);
             }
             else {
-                observeAttribute(element, attribute, expression);
+                observeAttribute(element, attribute.name, expression);
             }
         }
+    }
+
+    function cleanNodes(nodes, removeSubscriptions) {
+        for (const node of nodes) {
+            hydratableAttributes.delete(node);
+            hydratableEvents.delete(node);
+            removeEvents(node);
+            if (removeSubscriptions) {
+                const subscriptions = nodeSubscriptions.get(node) ?? [];
+                for (const subscription of subscriptions) {
+                    subscription.unsubscribe();
+                }
+                nodeSubscriptions.delete(node);
+            }
+            if (node.hasChildNodes()) {
+                cleanNodes(Array.from(node.childNodes), removeSubscriptions);
+            }
+        }
+    }
+    function createNode(value) {
+        if (value instanceof Node) {
+            return value;
+        }
+        return value instanceof Template
+            ? value.render()
+            : document.createTextNode(getString(value));
+    }
+    function createNodes(html) {
+        const element = document.createElement('template');
+        element.innerHTML = html;
+        const fragment = element.content.cloneNode(true);
+        const scripts = Array.from(fragment.querySelectorAll('script'));
+        for (const script of scripts) {
+            script.remove();
+        }
+        fragment.normalize();
+        return fragment;
     }
     function mapNodes(data, template, node) {
         const { expressions } = data.get(template);
@@ -740,7 +752,7 @@ var Blixt = (function (exports) {
     }
     function replaceNodes(from, to, set) {
         const nodes = (from ?? []).flatMap(item => item.nodes);
-        cleanNodes(nodes);
+        cleanNodes(nodes, true);
         for (const node of nodes) {
             if (nodes.indexOf(node) === 0) {
                 node.before(...to.flatMap(item => item.nodes));
@@ -760,7 +772,81 @@ var Blixt = (function (exports) {
             : [node]));
     }
 
-    const templateData = new WeakMap();
+    function compareNode(first, second, pairs) {
+        const firstChildren = Array.from(first.childNodes).filter(child => isValidNode(child));
+        const secondChildren = Array.from(second.childNodes).filter(child => isValidNode(child));
+        const { length } = firstChildren;
+        if (length !== secondChildren.length) {
+            console.warn('Nodes do not have same number of children');
+            return false;
+        }
+        if (length === 0) {
+            const valid = first.isEqualNode(second);
+            if (valid) {
+                pairs.push({ first, second });
+            }
+            else {
+                console.warn('Nodes are not equal');
+            }
+            return valid;
+        }
+        for (let index = 0; index < length; index += 1) {
+            if (!compareNode(firstChildren[index], secondChildren[index], pairs)) {
+                return false;
+            }
+        }
+        pairs.push({ first, second });
+        return true;
+    }
+    function hydrate(node, template, callback) {
+        const rendered = render(template);
+        const pairs = [];
+        if (normaliseContent(node) !== normaliseContent(rendered) ||
+            !compareNode(node, rendered, pairs)) {
+            console.warn('Unable to hydrate existing content');
+            return node;
+        }
+        for (const pair of pairs) {
+            if (pair.first instanceof HTMLElement || pair.first instanceof SVGElement) {
+                hydrateElement(pair.first, pair.second);
+            }
+        }
+        cleanNodes([rendered], false);
+        if (typeof callback === 'function') {
+            callback(node);
+        }
+        return node;
+    }
+    function hydrateElement(existing, templated) {
+        const attributes = hydratableAttributes.get(templated) ?? new Map();
+        for (const [name, expressions] of attributes) {
+            for (const expression of expressions) {
+                observeAttribute(existing, name, expression);
+            }
+        }
+        const events = hydratableEvents.get(templated) ?? new Map();
+        for (const [name, expressions] of events) {
+            for (const expression of expressions) {
+                addEvent(existing, name, expression);
+            }
+        }
+        const subscriptions = nodeSubscriptions.get(templated) ?? new Set();
+        if (subscriptions.size > 0) {
+            nodeSubscriptions.set(existing, subscriptions);
+        }
+        nodeSubscriptions.delete(templated);
+        hydratableEvents.delete(templated);
+    }
+    function isValidNode(node) {
+        if (node instanceof Text) {
+            return (node?.textContent ?? '').trim().length > 0;
+        }
+        return node instanceof Element ? !/^script$/i.test(node.tagName) : true;
+    }
+    function normaliseContent(node) {
+        return (node?.textContent ?? '').replaceAll(/\s+/g, ' ').trim();
+    }
+
     class Expression {
         get value() {
             return this.callback;
@@ -793,6 +879,17 @@ var Blixt = (function (exports) {
             });
         }
         /**
+         * - Hydrates an existing node using the template and all its expressions
+         * - If a callback is provided, it will be called after the node has been successfully hydrated
+         *
+         * @param {Node} node
+         * @param {((node: Node) => void)=} callback
+         * @returns {Node}
+         */
+        hydrate(node, callback) {
+            return hydrate(node, this, callback);
+        }
+        /**
          * Sets the template's ID to uniquely identify it in a list of templates
          * @param {number|string|symbol} key
          * @returns {Template}
@@ -809,12 +906,15 @@ var Blixt = (function (exports) {
          * @returns {Node}
          */
         render(parent) {
-            const asString = toString(this);
-            const nodes = createNodes(asString);
-            const mapped = mapNodes(templateData, this, nodes);
-            parent?.append(mapped);
-            return parent ?? mapped;
+            const rendered = render(this);
+            parent?.append(rendered);
+            return parent ?? rendered;
         }
+    }
+    function render(template) {
+        const asString = toString(template);
+        const nodes = createNodes(asString);
+        return mapNodes(templateData, template, nodes);
     }
     /**
      * Creates a template

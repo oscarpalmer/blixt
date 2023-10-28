@@ -114,7 +114,7 @@ export function updateArray(
 		.filter(item => !identifiers.includes(item.identifier!))
 		.flatMap(item => item.nodes);
 
-	cleanNodes(nodes);
+	cleanNodes(nodes, true);
 
 	for (const node of nodes) {
 		node.remove();

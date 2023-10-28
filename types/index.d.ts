@@ -65,14 +65,23 @@ export declare class Template {
 	 * Gets the template's ID
 	 */
 	get id(): Key | undefined;
+
 	/**
 	 * Creates a template
 	 */
 	constructor(strings: TemplateStringsArray, expressions: any[]);
+
+	/**
+	 * - Hydrates an existing node using the template and all its expressions
+	 * - If a callback is provided, it will be called after the node has been successfully hydrated
+	 */
+	hydrate(node: Node, callback: ((node: Node) => void) | undefined): Node;
+
 	/**
 	 * Sets the template's ID to uniquely identify it in a list of templates
 	 */
 	identify(key: Key): this;
+
 	/**
 	 * Renders a template, on its own or for a parent
 	 */

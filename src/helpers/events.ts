@@ -1,4 +1,6 @@
+import {hydratableEvents} from '../data';
 import type {Expression} from '../template';
+import {storeAttributeOrEvent} from './index';
 
 type EventParameters = {
 	name: string;
@@ -14,28 +16,17 @@ const events = new WeakMap<Node, Map<string, Set<StoredEvent>>>();
 
 export function addEvent(
 	element: HTMLElement | SVGElement,
-	attribute: Attr,
+	attribute: string,
 	expression: Expression,
 ) {
-	const {name, options} = getEventParameters(attribute.name);
+	const {name, options} = getEventParameters(attribute);
 
 	element.addEventListener(name as never, expression.value as never, options);
 
-	element.removeAttribute(attribute.name);
+	element.removeAttribute(attribute);
 
-	const elementEvents = events.get(element);
-
-	if (elementEvents === undefined) {
-		events.set(element, new Map([[name, new Set([{expression, options}])]]));
-	} else {
-		const namedEvents = elementEvents.get(name);
-
-		if (namedEvents === undefined) {
-			elementEvents.set(name, new Set([{expression, options}]));
-		} else {
-			namedEvents.add({expression, options});
-		}
-	}
+	storeAttributeOrEvent(events, element, name, {expression, options});
+	storeAttributeOrEvent(hydratableEvents, element, attribute, expression);
 }
 
 export function getEventParameters(attribute: string): EventParameters {

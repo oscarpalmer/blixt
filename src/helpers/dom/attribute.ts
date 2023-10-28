@@ -50,9 +50,9 @@ export function mapAttributes(
 		}
 
 		if (name.startsWith('@')) {
-			addEvent(element, attribute, expression);
+			addEvent(element, attribute.name, expression);
 		} else {
-			observeAttribute(element, attribute, expression);
+			observeAttribute(element, attribute.name, expression);
 		}
 	}
 }

@@ -1,4 +1,5 @@
-import {storeSubscription} from '../helpers';
+import {hydratableAttributes} from '../data';
+import {storeAttributeOrEvent, storeSubscription} from '../helpers';
 import type {Expression} from '../template';
 import type {ObservableSubscription} from './index';
 import {observe} from './index';
@@ -23,34 +24,35 @@ const valueAttributeExpression = /^value$/i;
 
 export function observeAttribute(
 	element: HTMLElement | SVGElement,
-	attribute: Attr,
+	attribute: string,
 	expression: Expression,
 ): void {
-	const {name} = attribute;
-
-	const isBoolean = booleanAttributes.has(name.toLowerCase());
-	const isClass = classAttributeExpression.test(name);
-	const isStyle = styleAttributeExpression.test(name);
+	const isBoolean = booleanAttributes.has(attribute.toLowerCase());
+	const isClass = classAttributeExpression.test(attribute);
+	const isStyle = styleAttributeExpression.test(attribute);
 
 	if (isBoolean || isClass || isStyle) {
-		element.removeAttribute(name);
+		element.removeAttribute(attribute);
 	}
 
 	let subscription: ObservableSubscription | undefined;
 
 	if (isBoolean) {
-		subscription = observeBooleanAttribute(element, name, expression);
+		subscription = observeBooleanAttribute(element, attribute, expression);
 	} else if (isClass) {
-		subscription = observeClassAttribute(element, name, expression);
+		subscription = observeClassAttribute(element, attribute, expression);
 	} else if (isStyle) {
-		subscription = observeStyleAttribute(element, name, expression);
+		subscription = observeStyleAttribute(element, attribute, expression);
 	} else {
-		subscription = observeValueAttribute(element, name, expression);
+		subscription = observeValueAttribute(element, attribute, expression);
 	}
 
-	if (subscription !== undefined) {
-		storeSubscription(element, subscription);
+	if (subscription === undefined) {
+		return;
 	}
+
+	storeAttributeOrEvent(hydratableAttributes, element, attribute, expression);
+	storeSubscription(element, subscription);
 }
 
 function observeBooleanAttribute(

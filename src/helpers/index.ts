@@ -43,10 +43,6 @@ export function getValue(data: any, key: string): any {
 	let value: unknown = data;
 
 	for (const part of parts) {
-		if (value === undefined) {
-			return undefined;
-		}
-
 		value = (value as Record<string, any>)?.[part];
 	}
 
@@ -59,6 +55,27 @@ export function isGenericObject(value: unknown): boolean {
 
 export function isKey(value: unknown): boolean {
 	return keyTypes.has(typeof value);
+}
+
+export function storeAttributeOrEvent(
+	store: WeakMap<Node, Map<string, Set<unknown>>>,
+	node: Node,
+	name: string,
+	value: unknown,
+): void {
+	const nodeEvents = store.get(node);
+
+	if (nodeEvents === undefined) {
+		store.set(node, new Map([[name, new Set([value])]]));
+	} else {
+		const namedEvents = nodeEvents.get(name);
+
+		if (namedEvents === undefined) {
+			nodeEvents.set(name, new Set([value]));
+		} else {
+			namedEvents.add(value);
+		}
+	}
 }
 
 export function storeSubscription(
