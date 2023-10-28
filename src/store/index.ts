@@ -1,8 +1,16 @@
-import {proxies, stateKey, subscriptions} from '../data';
+import {proxies, stateKey, storeSubscriptions} from '../data';
 import {getKey, getString, getValue, isGenericObject} from '../helpers';
-import type {Data, HandleArrayParameters, Key, Store} from '../models';
+import type {Data, Key, Store} from '../models';
 import {State} from '../models';
 import {observeKey} from '../observer';
+
+type ArrayParameters = {
+	array: any[];
+	callback: string;
+	state: State;
+	prefix: string;
+	value: any;
+};
 
 export function createStore<T extends Data>(
 	data: T,
@@ -95,7 +103,7 @@ export function createStore<T extends Data>(
 
 	if (isParent) {
 		proxies.set(proxyState, proxy as never);
-		subscriptions.set(proxyState, new Map());
+		storeSubscriptions.set(proxyState, new Map());
 	}
 
 	return proxy as Store<T>;
@@ -124,7 +132,7 @@ function emit(
 	}
 
 	for (const key of keys) {
-		const subscribers = subscriptions.get(state)?.get(key);
+		const subscribers = storeSubscriptions.get(state)?.get(key);
 
 		if (subscribers === undefined) {
 			continue;
@@ -143,7 +151,7 @@ function emit(
 	}
 }
 
-function handleArray(parameters: HandleArrayParameters): unknown {
+function handleArray(parameters: ArrayParameters): unknown {
 	const {array, callback, state, prefix} = parameters;
 
 	function synthetic(...args: any[]) {

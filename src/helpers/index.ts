@@ -1,4 +1,6 @@
+import {nodeSubscriptions} from '../data';
 import type {Key} from '../models';
+import type {ObservableSubscription} from '../observer';
 
 const keyTypes = new Set<string>(['number', 'string', 'symbol']);
 
@@ -57,4 +59,17 @@ export function isGenericObject(value: unknown): boolean {
 
 export function isKey(value: unknown): boolean {
 	return keyTypes.has(typeof value);
+}
+
+export function storeSubscription(
+	element: Node,
+	subscription: ObservableSubscription,
+): void {
+	const subscriptions = nodeSubscriptions.get(element);
+
+	if (subscriptions === undefined) {
+		nodeSubscriptions.set(element, new Set([subscription]));
+	} else if (!subscriptions.has(subscription)) {
+		subscriptions.add(subscription);
+	}
 }

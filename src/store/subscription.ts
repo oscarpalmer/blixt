@@ -1,4 +1,4 @@
-import {stateKey, subscriptions} from '../data';
+import {stateKey, storeSubscriptions} from '../data';
 import {getString, isKey} from '../helpers';
 import type {Data, Key, Store, Subscriber} from '../models';
 import {State} from '../models';
@@ -11,6 +11,9 @@ type SubscriptionState = {
 
 const states = new WeakMap<StoreSubscription, SubscriptionState>();
 
+/**
+ * A subscription to a keyed value in a store, which can be unsubscribed and resubscribed as needed.
+ */
 export class StoreSubscription {
 	get key(): string {
 		return states.get(this)!.key;
@@ -37,7 +40,7 @@ export class StoreSubscription {
 			value: state,
 		});
 
-		const stored = subscriptions.get(state)!;
+		const stored = storeSubscriptions.get(state)!;
 		const subs = stored.get(keyAsString);
 
 		if (subs === undefined) {
@@ -63,7 +66,7 @@ function manage(type: 'add' | 'remove', subscription: StoreSubscription): void {
 		return;
 	}
 
-	const stored = subscriptions.get(state.value);
+	const stored = storeSubscriptions.get(state.value);
 	const subscribers = stored?.get(subscription.key);
 
 	if (

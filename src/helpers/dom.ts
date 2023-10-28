@@ -1,4 +1,4 @@
-import {blixt, comment} from '../data';
+import {blixt, comment, nodeSubscriptions} from '../data';
 import type {
 	ObservedItem,
 	TemplateData,
@@ -8,7 +8,7 @@ import type {
 import {observeAttribute} from '../observer/attribute';
 import {observeContent} from '../observer/content';
 import {Expression, Template} from '../template';
-import {addEvent} from './events';
+import {addEvent, removeEvents} from './events';
 import {getString} from './index';
 
 const documentFragmentConstructor = /^documentfragment$/i;
@@ -18,6 +18,24 @@ const onAttributeExpression = /^on/i;
 export const sourceAttributeNameExpression = /^(href|src|xlink:href)$/i;
 
 export const sourceAttributeValueExpression = /(data:text\/html|javascript:)/i;
+
+export function cleanNodes(nodes: Node[]): void {
+	for (const node of nodes) {
+		const subscriptions = nodeSubscriptions.get(node) ?? [];
+
+		for (const subscription of subscriptions) {
+			subscription.unsubscribe();
+		}
+
+		nodeSubscriptions.delete(node);
+
+		removeEvents(node);
+
+		if (node.hasChildNodes()) {
+			cleanNodes(Array.from(node.childNodes));
+		}
+	}
+}
 
 export function createNode(value: any): Node {
 	if (value instanceof Node) {
@@ -150,6 +168,8 @@ export function replaceNodes(
 	set: boolean,
 ): ObservedItem[] | undefined {
 	const nodes = (from ?? []).flatMap(item => item.nodes);
+
+	cleanNodes(nodes);
 
 	for (const node of nodes) {
 		if (nodes.indexOf(node) === 0) {

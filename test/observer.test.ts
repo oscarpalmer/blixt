@@ -11,6 +11,7 @@ const stored = store({
 	array: [1, 2, 3],
 	boolean: true,
 	content: 1,
+	sub: 0,
 });
 
 test('observe', () => {
@@ -124,6 +125,33 @@ ${'basic text'}`.render(context);
 		expect(third.nextSibling).toBeInstanceOf(Text);
 		expect(third.nextSibling.textContent).toEqual('basic text');
 	}, 25);
+});
+
+test('unsubscribe & resubscribe', () => {
+	let value = 0;
+
+	const subscription = observe(
+		() => {
+			return stored.sub > -1;
+		},
+		() => {
+			value += 1;
+		},
+	);
+
+	expect(value).toEqual(1);
+
+	subscription.unsubscribe();
+
+	stored.sub += 1;
+
+	expect(value).toEqual(1);
+
+	subscription.resubscribe();
+
+	stored.sub += 1;
+
+	expect(value).toEqual(2);
 });
 
 test('updateArray', () => {

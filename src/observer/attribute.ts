@@ -1,4 +1,6 @@
+import {storeSubscription} from '../helpers';
 import type {Expression} from '../template';
+import type {ObservableSubscription} from './index';
 import {observe} from './index';
 
 const booleanAttributes = new Set([
@@ -34,14 +36,20 @@ export function observeAttribute(
 		element.removeAttribute(name);
 	}
 
+	let subscription: ObservableSubscription | undefined;
+
 	if (isBoolean) {
-		observeBooleanAttribute(element, name, expression);
+		subscription = observeBooleanAttribute(element, name, expression);
 	} else if (isClass) {
-		observeClassAttribute(element, name, expression);
+		subscription = observeClassAttribute(element, name, expression);
 	} else if (isStyle) {
-		observeStyleAttribute(element, name, expression);
+		subscription = observeStyleAttribute(element, name, expression);
 	} else {
-		observeValueAttribute(element, name, expression);
+		subscription = observeValueAttribute(element, name, expression);
+	}
+
+	if (subscription !== undefined) {
+		storeSubscription(element, subscription);
 	}
 }
 
@@ -49,8 +57,8 @@ function observeBooleanAttribute(
 	element: HTMLElement | SVGElement,
 	name: string,
 	expression: Expression,
-): void {
-	observe(expression.value, (value: any) => {
+): ObservableSubscription {
+	return observe(expression.value, (value: any) => {
 		if (typeof value === 'boolean') {
 			(element as Record<string, any>)[name] = value;
 		}
@@ -61,7 +69,7 @@ function observeClassAttribute(
 	element: HTMLElement | SVGElement,
 	name: string,
 	expression: Expression,
-): void {
+): ObservableSubscription | undefined {
 	const classes = name
 		.split('.')
 		.slice(1)
@@ -72,7 +80,7 @@ function observeClassAttribute(
 		return;
 	}
 
-	observe(expression.value, (value: any) => {
+	return observe(expression.value, (value: any) => {
 		if (value === true) {
 			element.classList.add(...classes);
 		} else {
@@ -85,7 +93,7 @@ function observeStyleAttribute(
 	element: HTMLElement | SVGElement,
 	name: string,
 	expression: Expression,
-): void {
+): ObservableSubscription | undefined {
 	const [, first, second] = name.split('.');
 
 	const property = first.trim();
@@ -95,7 +103,7 @@ function observeStyleAttribute(
 		return;
 	}
 
-	observe(expression.value, (value: any) => {
+	return observe(expression.value, (value: any) => {
 		if (
 			value === undefined ||
 			value === null ||
@@ -116,10 +124,10 @@ function observeValueAttribute(
 	element: HTMLElement | SVGElement,
 	name: string,
 	expression: Expression,
-): void {
+): ObservableSubscription {
 	const isValueAttribute = valueAttributeExpression.test(name);
 
-	observe(expression.value, (value: any) => {
+	return observe(expression.value, (value: any) => {
 		if (isValueAttribute) {
 			(element as HTMLInputElement).value = value as never;
 		}

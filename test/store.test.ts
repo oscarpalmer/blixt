@@ -1,8 +1,11 @@
 import {expect, test} from 'bun:test';
 import {store} from '../src/store';
-import {subscribe, unsubscribe} from '../src/store/subscription';
+import type {StoreSubscription} from '../src/store/subscription';
+import {subscribe} from '../src/store/subscription';
 
 const key = 'nested.key';
+
+let sub: StoreSubscription;
 
 const stored = store({
 	array: {
@@ -26,6 +29,7 @@ const stored = store({
 			c: 3,
 		},
 	},
+	sub: 0,
 });
 
 function onKey(newValue, oldValue, origin) {
@@ -78,7 +82,7 @@ test('subscribe', () => {
 		expect(origin).toEqual(key);
 	});
 
-	subscribe(stored, key, onKey);
+	sub = subscribe(stored, key, onKey);
 
 	stored.nested.key += 1;
 
@@ -95,12 +99,37 @@ test('subscribe', () => {
 	} catch (error) {
 		expect(error).toBeInstanceOf(TypeError);
 	}
+
+	try {
+		// @ts-expect-error Testing invalid input
+		subscribe(stored, 'abc', null);
+	} catch (error) {
+		expect(error).toBeInstanceOf(TypeError);
+	}
 });
 
-test('unsubscribe', () => {
-	unsubscribe(stored, key, onKey);
+test('unsubscribe & resubscribe', () => {
+	let value = 0;
 
-	stored.nested.key += 1;
+	const subscription = subscribe(stored, 'sub', () => {
+		value += 1;
+	});
 
-	expect(stored.count).toEqual(1);
+	expect(value).toEqual(0);
+
+	stored.sub += 1;
+
+	expect(value).toEqual(1);
+
+	subscription.unsubscribe();
+
+	stored.sub += 1;
+
+	expect(value).toEqual(1);
+
+	subscription.resubscribe();
+
+	stored.sub += 1;
+
+	expect(value).toEqual(2);
 });

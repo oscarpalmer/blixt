@@ -1,10 +1,11 @@
 /** @typedef {{[index: number]: any; [key: string]: any}} Data */
 /** @typedef {{[K in keyof T]: T[K] extends Data ? Store<T[K]> : T[K]} & Data} Store<T> @template T */
 const blixt = 'blixt';
-const comment = `<!--${blixt}-->`;
+const comment = '<!--blixt-->';
+const nodeSubscriptions = new WeakMap();
 const proxies = new WeakMap();
 const stateKey = '__state';
-const subscriptions = new WeakMap();
+const storeSubscriptions = new WeakMap();
 
 const keyTypes = new Set(['number', 'string', 'symbol']);
 function compareArrayOrder(first, second) {
@@ -46,11 +47,23 @@ function isGenericObject(value) {
 function isKey(value) {
     return keyTypes.has(typeof value);
 }
+function storeSubscription(element, subscription) {
+    const subscriptions = nodeSubscriptions.get(element);
+    if (subscriptions === undefined) {
+        nodeSubscriptions.set(element, new Set([subscription]));
+    }
+    else if (!subscriptions.has(subscription)) {
+        subscriptions.add(subscription);
+    }
+}
 
 class State {
 }
 
 const states$1 = new WeakMap();
+/**
+ * A subscription to a keyed value in a store, which can be unsubscribed and resubscribed as needed.
+ */
 class StoreSubscription {
     get key() {
         return states$1.get(this).key;
@@ -71,7 +84,7 @@ class StoreSubscription {
             key: keyAsString,
             value: state,
         });
-        const stored = subscriptions.get(state);
+        const stored = storeSubscriptions.get(state);
         const subs = stored.get(keyAsString);
         if (subs === undefined) {
             stored.set(keyAsString, new Set([callback]));
@@ -92,7 +105,7 @@ function manage$1(type, subscription) {
     if (state === undefined) {
         return;
     }
-    const stored = subscriptions.get(state.value);
+    const stored = storeSubscriptions.get(state.value);
     const subscribers = stored?.get(subscription.key);
     if (type === 'add' &&
         subscribers !== undefined &&
@@ -306,7 +319,7 @@ function createStore(data, state, prefix) {
     });
     if (isParent) {
         proxies.set(proxyState, proxy);
-        subscriptions.set(proxyState, new Map());
+        storeSubscriptions.set(proxyState, new Map());
     }
     return proxy;
 }
@@ -321,7 +334,7 @@ function emit(state, prefix, properties, values) {
             .reverse());
     }
     for (const key of keys) {
-        const subscribers = subscriptions.get(state)?.get(key);
+        const subscribers = storeSubscriptions.get(state)?.get(key);
         if (subscribers === undefined) {
             continue;
         }
@@ -427,21 +440,25 @@ function observeAttribute(element, attribute, expression) {
     if (isBoolean || isClass || isStyle) {
         element.removeAttribute(name);
     }
+    let subscription;
     if (isBoolean) {
-        observeBooleanAttribute(element, name, expression);
+        subscription = observeBooleanAttribute(element, name, expression);
     }
     else if (isClass) {
-        observeClassAttribute(element, name, expression);
+        subscription = observeClassAttribute(element, name, expression);
     }
     else if (isStyle) {
-        observeStyleAttribute(element, name, expression);
+        subscription = observeStyleAttribute(element, name, expression);
     }
     else {
-        observeValueAttribute(element, name, expression);
+        subscription = observeValueAttribute(element, name, expression);
+    }
+    if (subscription !== undefined) {
+        storeSubscription(element, subscription);
     }
 }
 function observeBooleanAttribute(element, name, expression) {
-    observe(expression.value, (value) => {
+    return observe(expression.value, (value) => {
         if (typeof value === 'boolean') {
             element[name] = value;
         }
@@ -456,7 +473,7 @@ function observeClassAttribute(element, name, expression) {
     if (classes.length === 0) {
         return;
     }
-    observe(expression.value, (value) => {
+    return observe(expression.value, (value) => {
         if (value === true) {
             element.classList.add(...classes);
         }
@@ -472,7 +489,7 @@ function observeStyleAttribute(element, name, expression) {
     if (property.length === 0 || (suffix !== undefined && suffix.length === 0)) {
         return;
     }
-    observe(expression.value, (value) => {
+    return observe(expression.value, (value) => {
         if (value === undefined ||
             value === null ||
             value === false ||
@@ -486,7 +503,7 @@ function observeStyleAttribute(element, name, expression) {
 }
 function observeValueAttribute(element, name, expression) {
     const isValueAttribute = valueAttributeExpression.test(name);
-    observe(expression.value, (value) => {
+    return observe(expression.value, (value) => {
         if (isValueAttribute) {
             element.value = value;
         }
@@ -549,10 +566,10 @@ function updateArray(comment, current, array) {
             id: item.identifier,
             value: node,
         })));
-        const prepend = compared === 'added' && !oldIdentifiers.includes(identifiers[0]);
+        const before = compared === 'added' && !oldIdentifiers.includes(identifiers[0]);
         for (const item of items) {
             if (compared === 'dissimilar' || !oldIdentifiers.includes(item.id)) {
-                if (items.indexOf(item) === 0 && prepend) {
+                if (items.indexOf(item) === 0 && before) {
                     position.before(item.value);
                 }
                 else {
@@ -565,16 +582,31 @@ function updateArray(comment, current, array) {
     const nodes = current
         .filter(item => !identifiers.includes(item.identifier))
         .flatMap(item => item.nodes);
+    cleanNodes(nodes);
     for (const node of nodes) {
         node.remove();
     }
     return observed;
 }
 
+const events = new WeakMap();
 function addEvent(element, attribute, expression) {
     const { name, options } = getEventParameters(attribute.name);
     element.addEventListener(name, expression.value, options);
     element.removeAttribute(attribute.name);
+    const elementEvents = events.get(element);
+    if (elementEvents === undefined) {
+        events.set(element, new Map([[name, new Set([{ expression, options }])]]));
+    }
+    else {
+        const namedEvents = elementEvents.get(name);
+        if (namedEvents === undefined) {
+            elementEvents.set(name, new Set([{ expression, options }]));
+        }
+        else {
+            namedEvents.add({ expression, options });
+        }
+    }
 }
 function getEventParameters(attribute) {
     let name = attribute.slice(1);
@@ -594,11 +626,36 @@ function getEventParameters(attribute) {
         options,
     };
 }
+function removeEvents(element) {
+    const elementEvents = events.get(element);
+    if (elementEvents === undefined) {
+        return;
+    }
+    for (const [name, namedEvents] of elementEvents) {
+        for (const event of namedEvents) {
+            element.removeEventListener(name, event.expression.value, event.options);
+        }
+    }
+    events.delete(element);
+}
 
 const documentFragmentConstructor = /^documentfragment$/i;
 const onAttributeExpression = /^on/i;
 const sourceAttributeNameExpression = /^(href|src|xlink:href)$/i;
 const sourceAttributeValueExpression = /(data:text\/html|javascript:)/i;
+function cleanNodes(nodes) {
+    for (const node of nodes) {
+        const subscriptions = nodeSubscriptions.get(node) ?? [];
+        for (const subscription of subscriptions) {
+            subscription.unsubscribe();
+        }
+        nodeSubscriptions.delete(node);
+        removeEvents(node);
+        if (node.hasChildNodes()) {
+            cleanNodes(Array.from(node.childNodes));
+        }
+    }
+}
 function createNode(value) {
     if (value instanceof Node) {
         return value;
@@ -682,6 +739,7 @@ function mapNodes(data, template, node) {
 }
 function replaceNodes(from, to, set) {
     const nodes = (from ?? []).flatMap(item => item.nodes);
+    cleanNodes(nodes);
     for (const node of nodes) {
         if (nodes.indexOf(node) === 0) {
             node.before(...to.flatMap(item => item.nodes));

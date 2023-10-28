@@ -1,5 +1,10 @@
 import {expect, test} from 'bun:test';
-import {addEvent, getEventParameters} from '../../src/helpers/events';
+import {
+	addEvent,
+	getEventParameters,
+	removeEvents,
+} from '../../src/helpers/events';
+import {Expression} from '../../src/template';
 
 test('getEventParameters', () => {
 	const simple = getEventParameters('@click');
@@ -27,27 +32,39 @@ test('getEventParameters', () => {
 	expect(all.options.once).toEqual(true);
 });
 
-test('handleEvent', () => {
+test('addEvent & removeEvent', () => {
 	let value = 0;
 
-	const element = document.createElement('div');
+	const expression = new Expression(() => {
+		value += 1;
+	});
 
-	const attribute = document.createAttribute('@click');
+	const button = document.createElement('button');
 
-	element.setAttribute(attribute.name, '');
+	const clickAttribute = document.createAttribute('@click');
+	const focusAttribute = document.createAttribute('@focus');
 
-	const expression = {
-		value() {
-			value += 1;
-		},
-	};
+	button.setAttribute(clickAttribute.name, '');
+	button.setAttribute(focusAttribute.name, '');
 
-	addEvent(element, attribute, expression);
+	addEvent(button, clickAttribute, expression);
+	addEvent(button, focusAttribute, expression);
 
-	expect(element.getAttribute('@click')).toEqual(null);
-	expect(value).toEqual(0);
+	expect(button.getAttribute('@click')).toEqual(null);
+	expect(button.getAttribute('@focus')).toEqual(null);
 
-	element.click();
+	button.dispatchEvent(new MouseEvent('click'));
 
 	expect(value).toEqual(1);
+
+	button.dispatchEvent(new FocusEvent('focus'));
+
+	expect(value).toEqual(2);
+
+	removeEvents(button);
+
+	button.click();
+	button.focus();
+
+	expect(value).toEqual(2);
 });

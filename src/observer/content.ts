@@ -1,6 +1,7 @@
 import type {ObservedItem} from '../models';
 import {compareArrayOrder} from '../helpers';
 import {
+	cleanNodes,
 	createNode,
 	getObservedItem,
 	getObservedItems,
@@ -98,12 +99,12 @@ export function updateArray(
 			})),
 		);
 
-		const prepend =
+		const before =
 			compared === 'added' && !oldIdentifiers.includes(identifiers[0]);
 
 		for (const item of items) {
 			if (compared === 'dissimilar' || !oldIdentifiers.includes(item.id)) {
-				if (items.indexOf(item) === 0 && prepend) {
+				if (items.indexOf(item) === 0 && before) {
 					position.before(item.value);
 				} else {
 					position.after(item.value);
@@ -117,6 +118,8 @@ export function updateArray(
 	const nodes = current
 		.filter(item => !identifiers.includes(item.identifier!))
 		.flatMap(item => item.nodes);
+
+	cleanNodes(nodes);
 
 	for (const node of nodes) {
 		node.remove();

@@ -2,19 +2,6 @@ import type {Expression, Template} from './template';
 
 export type Data = {[index: number]: any; [key: string]: any};
 
-export type EventParameters = {
-	name: string;
-	options: AddEventListenerOptions;
-};
-
-export type HandleArrayParameters = {
-	array: any[];
-	callback: string;
-	state: State;
-	prefix: string;
-	value: any;
-};
-
 export type Key = number | string | symbol;
 
 export type ObservedItem = {
