@@ -1,7 +1,7 @@
 import {comment} from './data';
 import {getString, isKey} from './helpers';
 import type {Key, TemplateData} from './models';
-import {createNodes, mapNodes} from './helpers/dom';
+import {createNodes, mapNodes} from './helpers/dom/node';
 
 const templateData = new WeakMap<Template, TemplateData>();
 

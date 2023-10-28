@@ -59,8 +59,10 @@ function observeBooleanAttribute(
 	expression: Expression,
 ): ObservableSubscription {
 	return observe(expression.value, (value: any) => {
-		if (typeof value === 'boolean') {
-			(element as Record<string, any>)[name] = value;
+		const isBoolean = typeof value === 'boolean';
+
+		if (value === undefined || value === null || isBoolean) {
+			(element as Record<string, any>)[name] = isBoolean ? value : false;
 		}
 	});
 }

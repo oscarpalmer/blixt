@@ -1,23 +1,18 @@
-import {blixt, comment, nodeSubscriptions} from '../data';
 import type {
 	ObservedItem,
 	TemplateData,
 	TemplateExpressionValue,
-	TemplateExpressions,
-} from '../models';
-import {observeAttribute} from '../observer/attribute';
-import {observeContent} from '../observer/content';
-import {Expression, Template} from '../template';
-import {addEvent, removeEvents} from './events';
-import {getString} from './index';
-
-const documentFragmentConstructor = /^documentfragment$/i;
-
-const onAttributeExpression = /^on/i;
-
-export const sourceAttributeNameExpression = /^(href|src|xlink:href)$/i;
-
-export const sourceAttributeValueExpression = /(data:text\/html|javascript:)/i;
+} from '../../models';
+import {
+	blixt,
+	documentFragmentConstructor,
+	nodeSubscriptions,
+} from '../../data';
+import {observeContent} from '../../observer/content';
+import {Expression, Template} from '../../template';
+import {getString} from '../index';
+import {removeEvents} from '../events';
+import {mapAttributes} from './attribute';
 
 export function cleanNodes(nodes: Node[]): void {
 	for (const node of nodes) {
@@ -65,73 +60,6 @@ export function createNodes(html: string): DocumentFragment {
 	fragment.normalize();
 
 	return fragment as DocumentFragment;
-}
-
-export function getObservedItem(value: any): ObservedItem {
-	return {
-		identifier: value instanceof Template ? value.id : undefined,
-		nodes: getObservedItems(createNode(value)).flatMap(item => item.nodes),
-	};
-}
-
-export function getObservedItems(value: Node | Node[]): ObservedItem[] {
-	const array = Array.isArray(value) ? value : [value];
-
-	return array
-		.filter(item => item instanceof Node)
-		.map(item =>
-			documentFragmentConstructor.test(item.constructor.name)
-				? Array.from(item.childNodes)
-				: [item],
-		)
-		.map(items => ({nodes: items as ChildNode[]}));
-}
-
-export function isBadAttribute(attribute: Attr): boolean {
-	const {name, value} = attribute;
-
-	if (onAttributeExpression.test(name)) {
-		return true;
-	}
-
-	return (
-		sourceAttributeNameExpression.test(name) &&
-		sourceAttributeValueExpression.test(value)
-	);
-}
-
-export function mapAttributes(
-	element: Element,
-	expressions: TemplateExpressions,
-): void {
-	const attributes = Array.from(element.attributes);
-
-	for (const attribute of attributes) {
-		const {name, value} = attribute;
-
-		const expression =
-			value === comment ? expressions.values[expressions.index++] : undefined;
-
-		const badAttribute = isBadAttribute(attribute);
-
-		if (
-			badAttribute ||
-			!(expression instanceof Expression) ||
-			!(element instanceof HTMLElement || element instanceof SVGElement)
-		) {
-			if (badAttribute) {
-				element.removeAttribute(name);
-			}
-
-			continue;
-		}
-
-		if (name.startsWith('@')) {
-			addEvent(element, attribute, expression);
-		} else {
-			observeAttribute(element, attribute, expression);
-		}
-	}
 }
 
 export function mapNodes(

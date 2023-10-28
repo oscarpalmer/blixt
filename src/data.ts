@@ -5,6 +5,8 @@ export const blixt = 'blixt';
 
 export const comment = '<!--blixt-->';
 
+export const documentFragmentConstructor = /^documentfragment$/i;
+
 export const nodeSubscriptions = new WeakMap<
 	Node,
 	Set<ObservableSubscription>

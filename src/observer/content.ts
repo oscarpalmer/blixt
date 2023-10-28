@@ -1,12 +1,7 @@
 import type {ObservedItem} from '../models';
 import {compareArrayOrder} from '../helpers';
-import {
-	cleanNodes,
-	createNode,
-	getObservedItem,
-	getObservedItems,
-	replaceNodes,
-} from '../helpers/dom';
+import {getObservedItem, getObservedItems} from '../helpers/dom';
+import {cleanNodes, createNode, replaceNodes} from '../helpers/dom/node';
 import type {Expression} from '../template';
 import {Template} from '../template';
 import {observe} from './index';
