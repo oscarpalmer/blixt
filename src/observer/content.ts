@@ -1,4 +1,5 @@
 import type {ObservedItem} from '../models';
+import {nodeItems} from '../data';
 import {compareArrayOrder} from '../helpers';
 import {getObservedItem, getObservedItems} from '../helpers/dom';
 import {cleanNodes, createNode, replaceNodes} from '../helpers/dom/node';
@@ -7,30 +8,33 @@ import {Template} from '../template';
 import {observe} from './index';
 
 export function observeContent(comment: Comment, expression: Expression): void {
-	let current: ObservedItem[] | undefined;
+	let index: number | undefined;
 	let isText = false;
 
 	observe(expression.value, (value: any) => {
+		const items = index === undefined ? undefined : nodeItems[index];
 		const isArray = Array.isArray(value);
 
 		if (value === undefined || value === null || isArray) {
 			isText = false;
 
-			current =
+			index = setContent(
+				index,
 				isArray && value.length > 0
-					? updateArray(comment, current, value)
-					: current === undefined
+					? updateArray(comment, items, value)
+					: items === undefined
 					? undefined
-					: replaceNodes(current, [{nodes: [comment]}], false)!;
+					: replaceNodes(items, [{nodes: [comment]}], false),
+			);
 
 			return;
 		}
 
 		const node = createNode(value);
 
-		if (current !== undefined && isText && node instanceof Text) {
-			if (current[0].nodes[0].textContent !== node.textContent) {
-				current[0].nodes[0].textContent = node.textContent;
+		if (items !== undefined && isText && node instanceof Text) {
+			if (items[0].nodes[0].textContent !== node.textContent) {
+				items[0].nodes[0].textContent = node.textContent;
 			}
 
 			return;
@@ -38,12 +42,32 @@ export function observeContent(comment: Comment, expression: Expression): void {
 
 		isText = node instanceof Text;
 
-		current = replaceNodes(
-			current ?? [{nodes: [comment]}],
-			getObservedItems(node),
-			true,
+		index = setContent(
+			index,
+			replaceNodes(items ?? [{nodes: [comment]}], getObservedItems(node), true),
 		);
 	});
+}
+
+function setContent(
+	index: number | undefined,
+	items: ObservedItem[] | undefined,
+): number | undefined {
+	if (items === undefined) {
+		if (index !== undefined) {
+			nodeItems.splice(index, 1);
+		}
+
+		return undefined;
+	}
+
+	if (index === undefined) {
+		return nodeItems.push(items) - 1;
+	}
+
+	nodeItems.splice(index, 1, items);
+
+	return index;
 }
 
 export function updateArray(

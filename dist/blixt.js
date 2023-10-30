@@ -3,8 +3,8 @@
 const blixt = 'blixt';
 const comment = '<!--blixt-->';
 const documentFragmentConstructor = /^documentfragment$/i;
-const hydratableAttributes = new WeakMap();
-const hydratableEvents = new WeakMap();
+const nodeItems = [];
+const nodeProperties = new WeakMap();
 const nodeSubscriptions = new WeakMap();
 const proxies = new WeakMap();
 const stateKey = '__state';
@@ -48,18 +48,18 @@ function isGenericObject(value) {
 function isKey(value) {
     return keyTypes.has(typeof value);
 }
-function storeAttributeOrEvent(store, node, name, value) {
-    const nodeEvents = store.get(node);
-    if (nodeEvents === undefined) {
-        store.set(node, new Map([[name, new Set([value])]]));
+function storeProperty(node, name, value) {
+    const stored = nodeProperties.get(node);
+    if (stored === undefined) {
+        nodeProperties.set(node, new Map([[name, new Set([value])]]));
     }
     else {
-        const namedEvents = nodeEvents.get(name);
-        if (namedEvents === undefined) {
-            nodeEvents.set(name, new Set([value]));
+        const named = stored.get(name);
+        if (named === undefined) {
+            stored.set(name, new Set([value]));
         }
         else {
-            namedEvents.add(value);
+            named.add(value);
         }
     }
 }
@@ -451,30 +451,43 @@ function getObservedItems(value) {
 }
 
 function observeContent(comment, expression) {
-    let current;
+    let index;
     let isText = false;
     observe(expression.value, (value) => {
+        const items = index === undefined ? undefined : nodeItems[index];
         const isArray = Array.isArray(value);
         if (value === undefined || value === null || isArray) {
             isText = false;
-            current =
-                isArray && value.length > 0
-                    ? updateArray(comment, current, value)
-                    : current === undefined
-                        ? undefined
-                        : replaceNodes(current, [{ nodes: [comment] }], false);
+            index = setContent(index, isArray && value.length > 0
+                ? updateArray(comment, items, value)
+                : items === undefined
+                    ? undefined
+                    : replaceNodes(items, [{ nodes: [comment] }], false));
             return;
         }
         const node = createNode(value);
-        if (current !== undefined && isText && node instanceof Text) {
-            if (current[0].nodes[0].textContent !== node.textContent) {
-                current[0].nodes[0].textContent = node.textContent;
+        if (items !== undefined && isText && node instanceof Text) {
+            if (items[0].nodes[0].textContent !== node.textContent) {
+                items[0].nodes[0].textContent = node.textContent;
             }
             return;
         }
         isText = node instanceof Text;
-        current = replaceNodes(current ?? [{ nodes: [comment] }], getObservedItems(node), true);
+        index = setContent(index, replaceNodes(items ?? [{ nodes: [comment] }], getObservedItems(node), true));
     });
+}
+function setContent(index, items) {
+    if (items === undefined) {
+        if (index !== undefined) {
+            nodeItems.splice(index, 1);
+        }
+        return undefined;
+    }
+    if (index === undefined) {
+        return nodeItems.push(items) - 1;
+    }
+    nodeItems.splice(index, 1, items);
+    return index;
 }
 function updateArray(comment, current, array) {
     let templated = array.filter(item => item instanceof Template && item.id !== undefined);
@@ -523,13 +536,11 @@ function updateArray(comment, current, array) {
     return observed;
 }
 
-const events = new WeakMap();
 function addEvent(element, attribute, expression) {
     const { name, options } = getEventParameters(attribute);
     element.addEventListener(name, expression.value, options);
     element.removeAttribute(attribute);
-    storeAttributeOrEvent(events, element, name, { expression, options });
-    storeAttributeOrEvent(hydratableEvents, element, attribute, expression);
+    storeProperty(element, attribute, { expression, options });
 }
 function getEventParameters(attribute) {
     let name = attribute.slice(1);
@@ -550,16 +561,23 @@ function getEventParameters(attribute) {
     };
 }
 function removeEvents(element) {
-    const elementEvents = events.get(element);
-    if (elementEvents === undefined) {
+    const stored = nodeProperties.get(element);
+    if (stored === undefined) {
         return;
     }
-    for (const [name, namedEvents] of elementEvents) {
-        for (const event of namedEvents) {
-            element.removeEventListener(name, event.expression.value, event.options);
+    for (const [name, events] of stored) {
+        for (const event of events) {
+            if (!(event instanceof Expression)) {
+                element.removeEventListener(name.slice(1), event.expression.value, event.options);
+            }
+        }
+        if (events.size === 0) {
+            stored.delete(name);
         }
     }
-    events.delete(element);
+    if (stored.size === 0) {
+        nodeProperties.delete(element);
+    }
 }
 
 const booleanAttributes = new Set([
@@ -599,7 +617,7 @@ function observeAttribute(element, attribute, expression) {
     if (subscription === undefined) {
         return;
     }
-    storeAttributeOrEvent(hydratableAttributes, element, attribute, expression);
+    storeProperty(element, attribute, expression);
     storeSubscription(element, subscription);
 }
 function observeBooleanAttribute(element, name, expression) {
@@ -698,9 +716,8 @@ function mapAttributes(element, expressions) {
 
 function cleanNodes(nodes, removeSubscriptions) {
     for (const node of nodes) {
-        hydratableAttributes.delete(node);
-        hydratableEvents.delete(node);
         removeEvents(node);
+        nodeProperties.delete(node);
         if (removeSubscriptions) {
             const subscriptions = nodeSubscriptions.get(node) ?? [];
             for (const subscription of subscriptions) {
@@ -772,6 +789,8 @@ function setNode(comment, value) {
 }
 
 function compareNode(first, second, pairs) {
+    first.normalize();
+    second.normalize();
     const firstChildren = Array.from(first.childNodes).filter(child => isValidNode(child));
     const secondChildren = Array.from(second.childNodes).filter(child => isValidNode(child));
     const { length } = firstChildren;
@@ -806,9 +825,9 @@ function hydrate(node, template, callback) {
         return node;
     }
     for (const pair of pairs) {
-        if (pair.first instanceof HTMLElement || pair.first instanceof SVGElement) {
-            hydrateElement(pair.first, pair.second);
-        }
+        hydrateContent(pair);
+        hydrateProperties(pair);
+        hydrateSubscriptions(pair);
     }
     cleanNodes([rendered], false);
     if (typeof callback === 'function') {
@@ -816,25 +835,37 @@ function hydrate(node, template, callback) {
     }
     return node;
 }
-function hydrateElement(existing, templated) {
-    const attributes = hydratableAttributes.get(templated) ?? new Map();
-    for (const [name, expressions] of attributes) {
-        for (const expression of expressions) {
-            observeAttribute(existing, name, expression);
+function hydrateContent(pair) {
+    const item = nodeItems
+        .find(items => items.some(item => item.nodes.includes(pair.second)))
+        ?.find(item => item.nodes.includes(pair.second));
+    if (item === undefined) {
+        return;
+    }
+    const index = item.nodes.indexOf(pair.second);
+    if (index > -1) {
+        item.nodes.splice(index, 1, pair.first);
+    }
+}
+function hydrateProperties(pair) {
+    const properties = nodeProperties.get(pair.second) ?? [];
+    for (const [name, items] of properties) {
+        for (const item of items) {
+            if (item instanceof Expression) {
+                observeAttribute(pair.first, name, item);
+            }
+            else {
+                addEvent(pair.first, name, item.expression);
+            }
         }
     }
-    const events = hydratableEvents.get(templated) ?? new Map();
-    for (const [name, expressions] of events) {
-        for (const expression of expressions) {
-            addEvent(existing, name, expression);
-        }
-    }
-    const subscriptions = nodeSubscriptions.get(templated) ?? new Set();
+}
+function hydrateSubscriptions(pair) {
+    const subscriptions = nodeSubscriptions.get(pair.second) ?? new Set();
     if (subscriptions.size > 0) {
-        nodeSubscriptions.set(existing, subscriptions);
+        nodeSubscriptions.set(pair.first, subscriptions);
     }
-    nodeSubscriptions.delete(templated);
-    hydratableEvents.delete(templated);
+    nodeSubscriptions.delete(pair.second);
 }
 function isValidNode(node) {
     if (node instanceof Text) {

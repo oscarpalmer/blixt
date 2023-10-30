@@ -1,5 +1,5 @@
 import type {NodePair} from '../models';
-import {nodeProperties, nodeSubscriptions} from '../data';
+import {nodeItems, nodeProperties, nodeSubscriptions} from '../data';
 import {cleanNodes} from '../helpers/dom/node';
 import {addEvent} from '../helpers/events';
 import {observeAttribute} from '../observer/attribute';
@@ -7,6 +7,9 @@ import type {Template} from './index';
 import {Expression, render} from './index';
 
 function compareNode(first: Node, second: Node, pairs: NodePair[]): boolean {
+	first.normalize();
+	second.normalize();
+
 	const firstChildren = Array.from(first.childNodes).filter(child =>
 		isValidNode(child),
 	);
@@ -65,7 +68,8 @@ export function hydrate(
 	}
 
 	for (const pair of pairs) {
-		hydrateNode(pair);
+		hydrateContent(pair);
+		hydrateProperties(pair);
 		hydrateSubscriptions(pair);
 	}
 
@@ -78,7 +82,25 @@ export function hydrate(
 	return node;
 }
 
-function hydrateNode(pair: NodePair): void {
+function hydrateContent(pair: NodePair): void {
+	const item = nodeItems
+		.find(items =>
+			items.some(item => item.nodes.includes(pair.second as never)),
+		)
+		?.find(item => item.nodes.includes(pair.second as never));
+
+	if (item === undefined) {
+		return;
+	}
+
+	const index = item.nodes.indexOf(pair.second as never);
+
+	if (index > -1) {
+		item.nodes.splice(index, 1, pair.first as never);
+	}
+}
+
+function hydrateProperties(pair: NodePair): void {
 	const properties = nodeProperties.get(pair.second) ?? [];
 
 	for (const [name, items] of properties) {

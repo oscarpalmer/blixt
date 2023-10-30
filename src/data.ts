@@ -1,4 +1,10 @@
-import type {EventExpression, State, Subscriber, TemplateData} from './models';
+import type {
+	EventExpression,
+	ObservedItem,
+	State,
+	Subscriber,
+	TemplateData,
+} from './models';
 import type {ObservableSubscription} from './observer';
 import type {Expression, Template} from './template';
 
@@ -7,6 +13,8 @@ export const blixt = 'blixt';
 export const comment = '<!--blixt-->';
 
 export const documentFragmentConstructor = /^documentfragment$/i;
+
+export const nodeItems: ObservedItem[][] = [];
 
 export const nodeProperties = new WeakMap<
 	Node,
