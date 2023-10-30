@@ -1,18 +1,11 @@
-import {hydratableEvents} from '../data';
-import type {Expression} from '../template';
-import {storeAttributeOrEvent} from './index';
+import {nodeProperties} from '../data';
+import {Expression} from '../template';
+import {storeProperty} from './index';
 
 type EventParameters = {
 	name: string;
 	options: AddEventListenerOptions;
 };
-
-type StoredEvent = {
-	expression: Expression;
-	options: AddEventListenerOptions;
-};
-
-const events = new WeakMap<Node, Map<string, Set<StoredEvent>>>();
 
 export function addEvent(
 	element: HTMLElement | SVGElement,
@@ -25,8 +18,7 @@ export function addEvent(
 
 	element.removeAttribute(attribute);
 
-	storeAttributeOrEvent(events, element, name, {expression, options});
-	storeAttributeOrEvent(hydratableEvents, element, attribute, expression);
+	storeProperty(element, attribute, {expression, options});
 }
 
 export function getEventParameters(attribute: string): EventParameters {
@@ -55,21 +47,29 @@ export function getEventParameters(attribute: string): EventParameters {
 }
 
 export function removeEvents(element: Node): void {
-	const elementEvents = events.get(element);
+	const stored = nodeProperties.get(element);
 
-	if (elementEvents === undefined) {
+	if (stored === undefined) {
 		return;
 	}
 
-	for (const [name, namedEvents] of elementEvents) {
-		for (const event of namedEvents) {
-			element.removeEventListener(
-				name as never,
-				event.expression.value as never,
-				event.options,
-			);
+	for (const [name, events] of stored) {
+		for (const event of events) {
+			if (!(event instanceof Expression)) {
+				element.removeEventListener(
+					name.slice(1),
+					event.expression.value,
+					event.options,
+				);
+			}
+		}
+
+		if (events.size === 0) {
+			stored.delete(name);
 		}
 	}
 
-	events.delete(element);
+	if (stored.size === 0) {
+		nodeProperties.delete(element);
+	}
 }

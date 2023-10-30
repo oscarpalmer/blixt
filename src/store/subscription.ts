@@ -1,7 +1,7 @@
-import {stateKey, storeSubscriptions} from '../data';
-import {getString, isKey} from '../helpers';
 import type {Data, Key, Store, Subscriber} from '../models';
 import {State} from '../models';
+import {stateKey, storeSubscriptions} from '../data';
+import {getString, isKey} from '../helpers';
 
 type SubscriptionState = {
 	callback: Subscriber;

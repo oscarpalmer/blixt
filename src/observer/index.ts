@@ -1,6 +1,6 @@
+import type {Data, Key, State, Store} from '../models';
 import {proxies, stateKey} from '../data';
 import {getString} from '../helpers';
-import type {Data, Key, State, Store} from '../models';
 import {StoreSubscription} from '../store/subscription';
 
 type ObservableSubscriptionState = {

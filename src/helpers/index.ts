@@ -1,6 +1,7 @@
-import {nodeSubscriptions} from '../data';
-import type {Key} from '../models';
+import {nodeProperties, nodeSubscriptions} from '../data';
+import type {EventExpression, Key} from '../models';
 import type {ObservableSubscription} from '../observer';
+import type {Expression} from '../template';
 
 const keyTypes = new Set<string>(['number', 'string', 'symbol']);
 
@@ -57,23 +58,22 @@ export function isKey(value: unknown): boolean {
 	return keyTypes.has(typeof value);
 }
 
-export function storeAttributeOrEvent(
-	store: WeakMap<Node, Map<string, Set<unknown>>>,
+export function storeProperty(
 	node: Node,
 	name: string,
-	value: unknown,
+	value: Expression | EventExpression,
 ): void {
-	const nodeEvents = store.get(node);
+	const stored = nodeProperties.get(node);
 
-	if (nodeEvents === undefined) {
-		store.set(node, new Map([[name, new Set([value])]]));
+	if (stored === undefined) {
+		nodeProperties.set(node, new Map([[name, new Set([value as never])]]));
 	} else {
-		const namedEvents = nodeEvents.get(name);
+		const named = stored.get(name);
 
-		if (namedEvents === undefined) {
-			nodeEvents.set(name, new Set([value]));
+		if (named === undefined) {
+			stored.set(name, new Set([value as never]));
 		} else {
-			namedEvents.add(value);
+			named.add(value as never);
 		}
 	}
 }

@@ -6,8 +6,7 @@ import type {
 import {
 	blixt,
 	documentFragmentConstructor,
-	hydratableAttributes,
-	hydratableEvents,
+	nodeProperties,
 	nodeSubscriptions,
 } from '../../data';
 import {observeContent} from '../../observer/content';
@@ -18,10 +17,9 @@ import {mapAttributes} from './attribute';
 
 export function cleanNodes(nodes: Node[], removeSubscriptions: boolean): void {
 	for (const node of nodes) {
-		hydratableAttributes.delete(node as never);
-		hydratableEvents.delete(node as never);
-
 		removeEvents(node);
+
+		nodeProperties.delete(node);
 
 		if (removeSubscriptions) {
 			const subscriptions = nodeSubscriptions.get(node) ?? [];

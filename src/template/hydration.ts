@@ -1,15 +1,10 @@
 import type {NodePair} from '../models';
-import {
-	hydratableAttributes,
-	hydratableEvents,
-	nodeSubscriptions,
-	storeSubscriptions,
-} from '../data';
+import {nodeProperties, nodeSubscriptions} from '../data';
 import {cleanNodes} from '../helpers/dom/node';
 import {addEvent} from '../helpers/events';
 import {observeAttribute} from '../observer/attribute';
-import type {Expression, Template} from './index';
-import {render} from './index';
+import type {Template} from './index';
+import {Expression, render} from './index';
 
 function compareNode(first: Node, second: Node, pairs: NodePair[]): boolean {
 	const firstChildren = Array.from(first.childNodes).filter(child =>
@@ -70,9 +65,8 @@ export function hydrate(
 	}
 
 	for (const pair of pairs) {
-		if (pair.first instanceof HTMLElement || pair.first instanceof SVGElement) {
-			hydrateElement(pair.first, pair.second as never);
-		}
+		hydrateNode(pair);
+		hydrateSubscriptions(pair);
 	}
 
 	cleanNodes([rendered], false);
@@ -84,37 +78,28 @@ export function hydrate(
 	return node;
 }
 
-function hydrateElement(
-	existing: HTMLElement | SVGElement,
-	templated: HTMLElement | SVGElement,
-): void {
-	const attributes =
-		hydratableAttributes.get(templated) ?? new Map<string, Set<Expression>>();
+function hydrateNode(pair: NodePair): void {
+	const properties = nodeProperties.get(pair.second) ?? [];
 
-	for (const [name, expressions] of attributes) {
-		for (const expression of expressions) {
-			observeAttribute(existing, name, expression);
+	for (const [name, items] of properties) {
+		for (const item of items) {
+			if (item instanceof Expression) {
+				observeAttribute(pair.first as never, name, item);
+			} else {
+				addEvent(pair.first as never, name, item.expression);
+			}
 		}
 	}
+}
 
-	const events =
-		hydratableEvents.get(templated) ?? new Map<string, Set<Expression>>();
-
-	for (const [name, expressions] of events) {
-		for (const expression of expressions) {
-			addEvent(existing, name, expression);
-		}
-	}
-
-	const subscriptions = nodeSubscriptions.get(templated) ?? new Set();
+function hydrateSubscriptions(pair: NodePair): void {
+	const subscriptions = nodeSubscriptions.get(pair.second) ?? new Set();
 
 	if (subscriptions.size > 0) {
-		nodeSubscriptions.set(existing, subscriptions);
+		nodeSubscriptions.set(pair.first, subscriptions);
 	}
 
-	nodeSubscriptions.delete(templated);
-
-	hydratableEvents.delete(templated);
+	nodeSubscriptions.delete(pair.second);
 }
 
 function isValidNode(node: Node): boolean {

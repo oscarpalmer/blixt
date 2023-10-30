@@ -2,6 +2,11 @@ import type {Expression, Template} from './template';
 
 export type Data = {[index: number]: any; [key: string]: any};
 
+export type EventExpression = {
+	expression: Expression;
+	options: AddEventListenerOptions;
+};
+
 export type Key = number | string | symbol;
 
 export type NodePair = {

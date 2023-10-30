@@ -1,5 +1,4 @@
-import {hydratableAttributes} from '../data';
-import {storeAttributeOrEvent, storeSubscription} from '../helpers';
+import {storeProperty, storeSubscription} from '../helpers';
 import type {Expression} from '../template';
 import type {ObservableSubscription} from './index';
 import {observe} from './index';
@@ -51,7 +50,7 @@ export function observeAttribute(
 		return;
 	}
 
-	storeAttributeOrEvent(hydratableAttributes, element, attribute, expression);
+	storeProperty(element, attribute, expression);
 	storeSubscription(element, subscription);
 }
 

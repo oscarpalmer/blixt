@@ -1,7 +1,7 @@
-import {proxies, stateKey, storeSubscriptions} from '../data';
-import {getKey, getString, getValue, isGenericObject} from '../helpers';
 import type {Data, Key, Store} from '../models';
 import {State} from '../models';
+import {proxies, stateKey, storeSubscriptions} from '../data';
+import {getKey, getString, getValue, isGenericObject} from '../helpers';
 import {observeKey} from '../observer';
 
 type ArrayParameters = {

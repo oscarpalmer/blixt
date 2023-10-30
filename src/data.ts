@@ -1,4 +1,4 @@
-import type {State, Subscriber, TemplateData} from './models';
+import type {EventExpression, State, Subscriber, TemplateData} from './models';
 import type {ObservableSubscription} from './observer';
 import type {Expression, Template} from './template';
 
@@ -8,14 +8,9 @@ export const comment = '<!--blixt-->';
 
 export const documentFragmentConstructor = /^documentfragment$/i;
 
-export const hydratableAttributes = new WeakMap<
+export const nodeProperties = new WeakMap<
 	Node,
-	Map<string, Set<Expression>>
->();
-
-export const hydratableEvents = new WeakMap<
-	Node,
-	Map<string, Set<Expression>>
+	Map<string, Set<Expression> | Set<EventExpression>>
 >();
 
 export const nodeSubscriptions = new WeakMap<

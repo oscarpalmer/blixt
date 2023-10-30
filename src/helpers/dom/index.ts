@@ -1,5 +1,5 @@
-import {documentFragmentConstructor} from '../../data';
 import type {ObservedItem} from '../../models';
+import {documentFragmentConstructor} from '../../data';
 import {Template} from '../../template';
 import {createNode} from './node';
 
