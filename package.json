@@ -10,9 +10,19 @@
 		"@rollup/plugin-typescript": "^11.1",
 		"bun": "^1.0",
 		"prettier": "^3.0",
-		"rollup": "^4.1",
+		"rollup": "^4.3",
 		"typescript": "^5.2",
 		"xo": "^0.56"
+	},
+	"exports": {
+		".": {
+			"types": "./types/index.d.ts",
+			"browser": "./dist/blixt.iife.js",
+			"module": "./dist/blixt.js",
+			"import": "./dist/blixt.js",
+			"default": "./dist/blixt.js"
+		},
+		"./package.json": "./package.json"
 	},
 	"files": [
 		"dist",
@@ -52,7 +62,7 @@
 	"type": "module",
 	"types": "src/index.d.ts",
 	"unpkg": "dist/blixt.iife.js",
-	"version": "0.29.0",
+	"version": "0.30.0",
 	"xo": {
 		"envs": [
 			"browser"
