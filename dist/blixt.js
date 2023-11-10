@@ -1,5 +1,5 @@
-/** @typedef {{[index: number]: any; [key: string]: any}} Data */
-/** @typedef {{[K in keyof T]: T[K] extends Data ? Store<T[K]> : T[K]} & Data} Store<T> @template T */
+/** @typedef {{[index: number]: unknown; [key: string]: unknown}} Data */
+/** @typedef {{[Key in keyof Value]: Value[Key] extends unknown[] ? Value[Key] : Value[Key] extends Data ? Store<Value[Key]> : Value[Key]}} Store<Value> @template Value */
 const blixt = 'blixt';
 const comment = '<!--blixt-->';
 const documentFragmentConstructor = /^documentfragment$/i;
@@ -138,7 +138,7 @@ function manage$1(type, subscription) {
  * @template {Data} T
  * @param {Store<T>} store
  * @param {number|string|symbol} key
- * @param {(newValue: any, oldValue?: any, origin?: string) => void} callback
+ * @param {(newValue: unknown, oldValue?: unknown, origin?: string) => void} callback
  * @returns {StoreSubscription}
  */
 function subscribe(store, key, callback) {
@@ -216,7 +216,7 @@ class ObservableSubscription {
         manage('add', this);
     }
     unsubscribe() {
-        manage('remove', this);
+        manage('delete', this);
     }
 }
 function manage(type, subscription) {
@@ -230,7 +230,7 @@ function manage(type, subscription) {
     for (const storeSubscription of state.subscriptions) {
         storeSubscription[add ? 'resubscribe' : 'unsubscribe']();
     }
-    parent.subscriptions[add ? 'add' : 'delete'](subscription);
+    parent.subscriptions[type](subscription);
     if (add) {
         parent.run();
     }
@@ -239,7 +239,7 @@ function manage(type, subscription) {
  * - Observes changes for properties used in a function
  * - Returns a subscription that can be unsubscribed and resubscribed as needed
  * @param {() => any} callback
- * @param {{(value: any) => any}=} after
+ * @param {{(value: unknown) => unknown}=} after
  * @returns {ObservableSubscription}
  */
 function observe(callback, after) {
@@ -268,6 +268,35 @@ function observeKey(state, key) {
         else {
             keys.add(getString(key));
         }
+    }
+}
+
+function emit(state, prefix, properties, values) {
+    const proxy = proxies.get(state);
+    const keys = properties.map(property => getKey(prefix, property));
+    const origin = properties.length > 1 ? prefix : keys[0];
+    if (prefix !== undefined) {
+        const parts = prefix.split('.');
+        keys.push(...parts
+            .map((_, index) => parts.slice(0, index + 1).join('.'))
+            .reverse());
+    }
+    for (const key of keys) {
+        emitValue({ key, keys, origin, prefix, proxy, state, values });
+    }
+}
+function emitValue(parameters) {
+    const { state, key, origin, proxy, keys, values } = parameters;
+    const subscribers = storeSubscriptions.get(state)?.get(key);
+    if (subscribers === undefined) {
+        return;
+    }
+    const callbacks = Array.from(subscribers);
+    const emitOrigin = key === origin ? undefined : origin;
+    const newValue = getValue(proxy, key);
+    const oldValue = (values[keys.indexOf(key)] ?? undefined);
+    for (const callback of callbacks) {
+        callback(newValue, oldValue, emitOrigin);
     }
 }
 
@@ -303,30 +332,9 @@ function createStore(data, state, prefix) {
         set(target, property, value) {
             const oldValue = Reflect.get(target, property);
             const newValue = transformItem(proxyState, prefix, property, value);
-            const setValue = Reflect.set(target, property, newValue);
-            if (setValue) {
-                let properties;
-                let values;
-                if (isStore(oldValue)) {
-                    properties = [];
-                    values = [];
-                    const oldKeys = Object.keys(oldValue);
-                    const newKeys = Object.keys(newValue);
-                    for (const key of oldKeys) {
-                        if (oldValue[key] !== newValue[key]) {
-                            properties.push(key);
-                            values.push(oldValue[key]);
-                        }
-                    }
-                    for (const key of newKeys) {
-                        if (!(key in oldValue)) {
-                            properties.push(key);
-                        }
-                    }
-                }
-                emit(proxyState, properties === undefined ? prefix : getKey(prefix, property), properties ?? [property], values ?? [oldValue]);
-            }
-            return setValue;
+            return Reflect.set(target, property, newValue)
+                ? setValue({ newValue, oldValue, prefix, property, state: proxyState })
+                : false;
         },
     });
     Object.defineProperty(proxy, stateKey, {
@@ -338,30 +346,6 @@ function createStore(data, state, prefix) {
         storeSubscriptions.set(proxyState, new Map());
     }
     return proxy;
-}
-function emit(state, prefix, properties, values) {
-    const proxy = proxies.get(state);
-    const keys = properties.map(property => getKey(prefix, property));
-    const origin = properties.length > 1 ? prefix : keys[0];
-    if (prefix !== undefined) {
-        const parts = prefix.split('.');
-        keys.push(...parts
-            .map((_, index) => parts.slice(0, index + 1).join('.'))
-            .reverse());
-    }
-    for (const key of keys) {
-        const subscribers = storeSubscriptions.get(state)?.get(key);
-        if (subscribers === undefined) {
-            continue;
-        }
-        const callbacks = Array.from(subscribers);
-        const emitOrigin = key === origin ? undefined : origin;
-        const newValue = getValue(proxy, key);
-        const oldValue = (values[keys.indexOf(key)] ?? undefined);
-        for (const callback of callbacks) {
-            callback(newValue, oldValue, emitOrigin);
-        }
-    }
 }
 function handleArray(parameters) {
     const { array, callback, state, prefix } = parameters;
@@ -407,6 +391,30 @@ function handleArray(parameters) {
 function isStore(value) {
     return value?.[stateKey] instanceof State;
 }
+function setValue(parameters) {
+    const { newValue, oldValue, prefix, property, state } = parameters;
+    let properties;
+    let values;
+    if (isStore(oldValue)) {
+        properties = [];
+        values = [];
+        const oldKeys = Object.keys(oldValue);
+        const newKeys = Object.keys(newValue);
+        for (const key of oldKeys) {
+            if (oldValue[key] !== newValue[key]) {
+                properties.push(key);
+                values.push(oldValue[key]);
+            }
+        }
+        for (const key of newKeys) {
+            if (!(key in oldValue)) {
+                properties.push(key);
+            }
+        }
+    }
+    emit(state, properties === undefined ? prefix : getKey(prefix, property), properties ?? [property], values ?? [oldValue]);
+    return true;
+}
 /**
  * Creates a reactive store
  * @template {Data} T
@@ -441,8 +449,7 @@ function getObservedItem(value) {
     };
 }
 function getObservedItems(value) {
-    const array = Array.isArray(value) ? value : [value];
-    return array
+    return (Array.isArray(value) ? value : [value])
         .filter(item => item instanceof Node)
         .map(item => documentFragmentConstructor.test(item.constructor.name)
         ? Array.from(item.childNodes)
@@ -453,7 +460,7 @@ function getObservedItems(value) {
 function observeContent(comment, expression) {
     let index;
     let isText = false;
-    observe(expression.value, (value) => {
+    observe(expression.value, value => {
         const items = index === undefined ? undefined : nodeItems[index];
         const isArray = Array.isArray(value);
         if (value === undefined || value === null || isArray) {
@@ -500,13 +507,13 @@ function updateArray(comment, current, array) {
             ? templated.map(template => getObservedItem(template))
             : getObservedItems(array.map(item => createNode(item))), true);
     }
-    const oldIdentifiers = current.map(item => item.identifier);
-    const compared = compareArrayOrder(oldIdentifiers, identifiers);
     const observed = [];
     for (const template of templated) {
         observed.push(current.find(item => item.identifier === template.id) ??
             getObservedItem(template));
     }
+    const oldIdentifiers = current.map(item => item.identifier);
+    const compared = compareArrayOrder(oldIdentifiers, identifiers);
     let position = current[0].nodes[0];
     if (compared !== 'removed') {
         const items = observed.flatMap(item => item.nodes.map(node => ({
@@ -561,10 +568,7 @@ function getEventParameters(attribute) {
     };
 }
 function removeEvents(element) {
-    const stored = nodeProperties.get(element);
-    if (stored === undefined) {
-        return;
-    }
+    const stored = nodeProperties.get(element) ?? new Map();
     for (const [name, events] of stored) {
         for (const event of events) {
             if (!(event instanceof Expression)) {
@@ -598,30 +602,23 @@ function observeAttribute(element, attribute, expression) {
     const isBoolean = booleanAttributes.has(attribute.toLowerCase());
     const isClass = classAttributeExpression.test(attribute);
     const isStyle = styleAttributeExpression.test(attribute);
+    let callback = observeValueAttribute;
     if (isBoolean || isClass || isStyle) {
         element.removeAttribute(attribute);
+        callback = isBoolean
+            ? observeBooleanAttribute
+            : isClass
+                ? observeClassAttribute
+                : observeStyleAttribute;
     }
-    let subscription;
-    if (isBoolean) {
-        subscription = observeBooleanAttribute(element, attribute, expression);
+    const subscription = callback(element, attribute, expression);
+    if (subscription !== undefined) {
+        storeProperty(element, attribute, expression);
+        storeSubscription(element, subscription);
     }
-    else if (isClass) {
-        subscription = observeClassAttribute(element, attribute, expression);
-    }
-    else if (isStyle) {
-        subscription = observeStyleAttribute(element, attribute, expression);
-    }
-    else {
-        subscription = observeValueAttribute(element, attribute, expression);
-    }
-    if (subscription === undefined) {
-        return;
-    }
-    storeProperty(element, attribute, expression);
-    storeSubscription(element, subscription);
 }
 function observeBooleanAttribute(element, name, expression) {
-    return observe(expression.value, (value) => {
+    return observe(expression.value, value => {
         const isBoolean = typeof value === 'boolean';
         if (value === undefined || value === null || isBoolean) {
             element[name] = isBoolean ? value : false;
@@ -637,7 +634,7 @@ function observeClassAttribute(element, name, expression) {
     if (classes.length === 0) {
         return;
     }
-    return observe(expression.value, (value) => {
+    return observe(expression.value, value => {
         if (value === true) {
             element.classList.add(...classes);
         }
@@ -653,7 +650,7 @@ function observeStyleAttribute(element, name, expression) {
     if (property.length === 0 || (suffix !== undefined && suffix.length === 0)) {
         return;
     }
-    return observe(expression.value, (value) => {
+    return observe(expression.value, value => {
         if (value === undefined ||
             value === null ||
             value === false ||
@@ -667,7 +664,7 @@ function observeStyleAttribute(element, name, expression) {
 }
 function observeValueAttribute(element, name, expression) {
     const isValueAttribute = valueAttributeExpression.test(name);
-    return observe(expression.value, (value) => {
+    return observe(expression.value, value => {
         if (isValueAttribute) {
             element.value = value;
         }
@@ -685,11 +682,9 @@ const sourceAttributeNameExpression = /^(href|src|xlink:href)$/i;
 const sourceAttributeValueExpression = /(data:text\/html|javascript:)/i;
 function isBadAttribute(attribute) {
     const { name, value } = attribute;
-    if (onAttributeExpression.test(name)) {
-        return true;
-    }
-    return (sourceAttributeNameExpression.test(name) &&
-        sourceAttributeValueExpression.test(value));
+    return (onAttributeExpression.test(name) ||
+        (sourceAttributeNameExpression.test(name) &&
+            sourceAttributeValueExpression.test(value)));
 }
 function mapAttributes(element, expressions) {
     const attributes = Array.from(element.attributes);

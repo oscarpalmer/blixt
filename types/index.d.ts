@@ -1,6 +1,6 @@
 export type Data = {
-	[index: number]: any;
-	[key: string]: any;
+	[index: number]: unknown;
+	[key: string]: unknown;
 };
 
 export type Key = number | string | symbol;
@@ -8,12 +8,16 @@ export type Key = number | string | symbol;
 declare class State {}
 
 export type Store<T extends Data> = {
-	[K in keyof T]: T[K] extends Data ? Store<T[K]> : T[K];
-} & Data;
+	[K in keyof T]: T[K] extends unknown[]
+		? T[K]
+		: T[K] extends Data
+		? Store<T[K]> & Data
+		: T[K];
+};
 
 export type Subscriber = (
-	newValue: any,
-	oldValue?: any,
+	newValue: unknown,
+	oldValue?: unknown,
 	origin?: string,
 ) => void;
 
@@ -31,8 +35,8 @@ export declare class ObservableSubscription {
  * - Returns a subscription that can be unsubscribed and resubscribed as needed
  */
 export declare function observe(
-	callback: () => any,
-	after: (value: any) => any,
+	callback: () => unknown,
+	after: (value: unknown) => unknown,
 ): ObservableSubscription;
 
 /**
@@ -69,7 +73,7 @@ export declare class Template {
 	/**
 	 * Creates a template
 	 */
-	constructor(strings: TemplateStringsArray, expressions: any[]);
+	constructor(strings: TemplateStringsArray, expressions: unknown[]);
 
 	/**
 	 * - Hydrates an existing node using the template and all its expressions
@@ -92,5 +96,5 @@ export declare class Template {
  */
 export declare function template(
 	strings: TemplateStringsArray,
-	...expressions: any[]
+	...expressions: unknown[]
 ): Template;

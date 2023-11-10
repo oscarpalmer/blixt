@@ -86,7 +86,7 @@ function manage(type: 'add' | 'remove', subscription: StoreSubscription): void {
  * @template {Data} T
  * @param {Store<T>} store
  * @param {number|string|symbol} key
- * @param {(newValue: any, oldValue?: any, origin?: string) => void} callback
+ * @param {(newValue: unknown, oldValue?: unknown, origin?: string) => void} callback
  * @returns {StoreSubscription}
  */
 export function subscribe<T extends Data>(

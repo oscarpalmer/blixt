@@ -30,36 +30,32 @@ export function observeAttribute(
 	const isClass = classAttributeExpression.test(attribute);
 	const isStyle = styleAttributeExpression.test(attribute);
 
+	let callback = observeValueAttribute;
+
 	if (isBoolean || isClass || isStyle) {
 		element.removeAttribute(attribute);
+
+		callback = isBoolean
+			? observeBooleanAttribute
+			: isClass
+			? observeClassAttribute
+			: observeStyleAttribute;
 	}
 
-	let subscription: ObservableSubscription | undefined;
+	const subscription = callback(element, attribute, expression);
 
-	if (isBoolean) {
-		subscription = observeBooleanAttribute(element, attribute, expression);
-	} else if (isClass) {
-		subscription = observeClassAttribute(element, attribute, expression);
-	} else if (isStyle) {
-		subscription = observeStyleAttribute(element, attribute, expression);
-	} else {
-		subscription = observeValueAttribute(element, attribute, expression);
+	if (subscription !== undefined) {
+		storeProperty(element, attribute, expression);
+		storeSubscription(element, subscription);
 	}
-
-	if (subscription === undefined) {
-		return;
-	}
-
-	storeProperty(element, attribute, expression);
-	storeSubscription(element, subscription);
 }
 
 function observeBooleanAttribute(
 	element: HTMLElement | SVGElement,
 	name: string,
 	expression: Expression,
-): ObservableSubscription {
-	return observe(expression.value, (value: any) => {
+): ObservableSubscription | undefined {
+	return observe(expression.value, value => {
 		const isBoolean = typeof value === 'boolean';
 
 		if (value === undefined || value === null || isBoolean) {
@@ -83,7 +79,7 @@ function observeClassAttribute(
 		return;
 	}
 
-	return observe(expression.value, (value: any) => {
+	return observe(expression.value, value => {
 		if (value === true) {
 			element.classList.add(...classes);
 		} else {
@@ -106,7 +102,7 @@ function observeStyleAttribute(
 		return;
 	}
 
-	return observe(expression.value, (value: any) => {
+	return observe(expression.value, value => {
 		if (
 			value === undefined ||
 			value === null ||
@@ -127,10 +123,10 @@ function observeValueAttribute(
 	element: HTMLElement | SVGElement,
 	name: string,
 	expression: Expression,
-): ObservableSubscription {
+): ObservableSubscription | undefined {
 	const isValueAttribute = valueAttributeExpression.test(name);
 
-	return observe(expression.value, (value: any) => {
+	return observe(expression.value, value => {
 		if (isValueAttribute) {
 			(element as HTMLInputElement).value = value as never;
 		}

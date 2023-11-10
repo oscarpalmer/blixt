@@ -11,7 +11,7 @@ export function observeContent(comment: Comment, expression: Expression): void {
 	let index: number | undefined;
 	let isText = false;
 
-	observe(expression.value, (value: any) => {
+	observe(expression.value, value => {
 		const items = index === undefined ? undefined : nodeItems[index];
 		const isArray = Array.isArray(value);
 
@@ -73,7 +73,7 @@ function setContent(
 export function updateArray(
 	comment: Comment,
 	current: ObservedItem[] | undefined,
-	array: any[],
+	array: unknown[],
 ): ObservedItem[] {
 	let templated = array.filter(
 		item => item instanceof Template && item.id !== undefined,
@@ -95,10 +95,6 @@ export function updateArray(
 		)!;
 	}
 
-	const oldIdentifiers = current.map(item => item.identifier!);
-
-	const compared = compareArrayOrder(oldIdentifiers, identifiers);
-
 	const observed = [];
 
 	for (const template of templated) {
@@ -107,6 +103,9 @@ export function updateArray(
 				getObservedItem(template),
 		);
 	}
+
+	const oldIdentifiers = current.map(item => item.identifier!);
+	const compared = compareArrayOrder(oldIdentifiers, identifiers);
 
 	let position = current[0].nodes[0];
 

@@ -22,12 +22,16 @@ export type ObservedItem = {
 export class State {}
 
 export type Store<T extends Data> = {
-	[K in keyof T]: T[K] extends Data ? Store<T[K]> : T[K];
-} & Data;
+	[K in keyof T]: T[K] extends unknown[]
+		? T[K]
+		: T[K] extends Data
+		? Store<T[K]> & Data
+		: T[K];
+};
 
 export type Subscriber = (
-	newValue: any,
-	oldValue?: any,
+	newValue: unknown,
+	oldValue?: unknown,
 	origin?: string,
 ) => void;
 
@@ -35,7 +39,7 @@ export type TemplateExpressionValue = Expression | Node | Template;
 
 export type TemplateExpressions = {
 	index: number;
-	original: any[];
+	original: unknown[];
 	values: TemplateExpressionValue[];
 };
 

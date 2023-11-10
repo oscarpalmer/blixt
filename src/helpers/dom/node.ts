@@ -37,7 +37,7 @@ export function cleanNodes(nodes: Node[], removeSubscriptions: boolean): void {
 	}
 }
 
-export function createNode(value: any): Node {
+export function createNode(value: unknown): Node {
 	if (value instanceof Node) {
 		return value;
 	}

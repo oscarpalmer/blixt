@@ -3,7 +3,7 @@ import {documentFragmentConstructor} from '../../data';
 import {Template} from '../../template';
 import {createNode} from './node';
 
-export function getObservedItem(value: any): ObservedItem {
+export function getObservedItem(value: unknown): ObservedItem {
 	return {
 		identifier: value instanceof Template ? value.id : undefined,
 		nodes: getObservedItems(createNode(value)).flatMap(item => item.nodes),
@@ -11,9 +11,7 @@ export function getObservedItem(value: any): ObservedItem {
 }
 
 export function getObservedItems(value: Node | Node[]): ObservedItem[] {
-	const array = Array.isArray(value) ? value : [value];
-
-	return array
+	return (Array.isArray(value) ? value : [value])
 		.filter(item => item instanceof Node)
 		.map(item =>
 			documentFragmentConstructor.test(item.constructor.name)

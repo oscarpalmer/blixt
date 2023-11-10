@@ -13,13 +13,10 @@ export const sourceAttributeValueExpression = /(data:text\/html|javascript:)/i;
 export function isBadAttribute(attribute: Attr): boolean {
 	const {name, value} = attribute;
 
-	if (onAttributeExpression.test(name)) {
-		return true;
-	}
-
 	return (
-		sourceAttributeNameExpression.test(name) &&
-		sourceAttributeValueExpression.test(value)
+		onAttributeExpression.test(name) ||
+		(sourceAttributeNameExpression.test(name) &&
+			sourceAttributeValueExpression.test(value))
 	);
 }
 

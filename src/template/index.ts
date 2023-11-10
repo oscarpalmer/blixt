@@ -9,7 +9,7 @@ export class Expression {
 		return this.callback;
 	}
 
-	constructor(private readonly callback: (...args: any[]) => any) {}
+	constructor(private readonly callback: (...args: unknown[]) => any) {}
 }
 
 export class Template {
@@ -28,7 +28,7 @@ export class Template {
 	 * @param {TemplateStringsArray} strings
 	 * @param {...any} expressions
 	 */
-	constructor(strings: TemplateStringsArray, expressions: any[]) {
+	constructor(strings: TemplateStringsArray, expressions: unknown[]) {
 		templateData.set(this, {
 			strings,
 			expressions: {
@@ -88,14 +88,17 @@ export function render(template: Template): Node {
 /**
  * Creates a template
  */
-export function template(strings: TemplateStringsArray, ...expressions: any[]) {
+export function template(
+	strings: TemplateStringsArray,
+	...expressions: unknown[]
+) {
 	return new Template(strings, expressions);
 }
 
 export function toString(template: Template): string {
 	const {strings, expressions} = templateData.get(template)!;
 
-	function express(value: string, expression: any): string {
+	function express(value: string, expression: unknown): string {
 		const isFunction = typeof expression === 'function';
 
 		if (

@@ -3,7 +3,6 @@
 		"name": "Oscar Palmér",
 		"url": "https://oscarpalmer.se"
 	},
-	"browser": "dist/blixt.iife.js",
 	"description": "⚡️",
 	"devDependencies": {
 		"@happy-dom/global-registrator": "^12.10",
@@ -17,10 +16,7 @@
 	"exports": {
 		".": {
 			"types": "./types/index.d.ts",
-			"browser": "./dist/blixt.iife.js",
-			"module": "./dist/blixt.js",
-			"import": "./dist/blixt.js",
-			"default": "./dist/blixt.js"
+			"import": "./dist/blixt.js"
 		},
 		"./package.json": "./package.json"
 	},
@@ -31,11 +27,12 @@
 	],
 	"jsdelivr": "dist/blixt.iife.js",
 	"keywords": [
+		"hydration",
 		"reactive",
 		"template"
 	],
 	"license": "MIT",
-	"main": "dist/blixt.iife.js",
+	"main": "dist/blixt.js",
 	"module": "dist/blixt.js",
 	"name": "@oscarpalmer/blixt",
 	"prettier": {
@@ -62,7 +59,7 @@
 	"type": "module",
 	"types": "src/index.d.ts",
 	"unpkg": "dist/blixt.iife.js",
-	"version": "0.30.0",
+	"version": "0.31.0",
 	"xo": {
 		"envs": [
 			"browser"

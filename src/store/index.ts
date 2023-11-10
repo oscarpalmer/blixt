@@ -1,15 +1,24 @@
 import type {Data, Key, Store} from '../models';
 import {State} from '../models';
 import {proxies, stateKey, storeSubscriptions} from '../data';
-import {getKey, getString, getValue, isGenericObject} from '../helpers';
+import {getKey, getString, isGenericObject} from '../helpers';
 import {observeKey} from '../observer';
+import {emit} from './emit';
 
 type ArrayParameters = {
-	array: any[];
+	array: unknown[];
 	callback: string;
 	state: State;
 	prefix: string;
-	value: any;
+	value: unknown;
+};
+
+type ValueParameters = {
+	newValue: unknown;
+	oldValue: unknown;
+	prefix: string | undefined;
+	property: Key;
+	state: State;
 };
 
 export function createStore<T extends Data>(
@@ -55,44 +64,10 @@ export function createStore<T extends Data>(
 		set(target, property, value) {
 			const oldValue = Reflect.get(target, property) as unknown;
 			const newValue = transformItem(proxyState, prefix, property, value);
-			const setValue = Reflect.set(target, property, newValue);
 
-			if (setValue) {
-				let properties;
-				let values;
-
-				if (isStore(oldValue)) {
-					properties = [];
-					values = [];
-
-					const oldKeys = Object.keys(oldValue as Store<Data>);
-					const newKeys = Object.keys(newValue as Store<Data>);
-
-					for (const key of oldKeys) {
-						if (
-							(oldValue as Store<Data>)[key] !== (newValue as Store<Data>)[key]
-						) {
-							properties.push(key);
-							values.push((oldValue as Store<Data>)[key]);
-						}
-					}
-
-					for (const key of newKeys) {
-						if (!(key in (oldValue as Store<Data>))) {
-							properties.push(key);
-						}
-					}
-				}
-
-				emit(
-					proxyState,
-					properties === undefined ? prefix : getKey(prefix, property),
-					properties ?? [property],
-					values ?? [oldValue],
-				);
-			}
-
-			return setValue;
+			return Reflect.set(target, property, newValue)
+				? setValue({newValue, oldValue, prefix, property, state: proxyState})
+				: false;
 		},
 	});
 
@@ -109,52 +84,10 @@ export function createStore<T extends Data>(
 	return proxy as Store<T>;
 }
 
-function emit(
-	state: State,
-	prefix: string | undefined,
-	properties: Key[],
-	values: any[],
-): void {
-	const proxy = proxies.get(state);
-
-	const keys = properties.map(property => getKey(prefix, property));
-
-	const origin = properties.length > 1 ? prefix : keys[0];
-
-	if (prefix !== undefined) {
-		const parts = prefix.split('.');
-
-		keys.push(
-			...parts
-				.map((_: any, index: number) => parts.slice(0, index + 1).join('.'))
-				.reverse(),
-		);
-	}
-
-	for (const key of keys) {
-		const subscribers = storeSubscriptions.get(state)?.get(key);
-
-		if (subscribers === undefined) {
-			continue;
-		}
-
-		const callbacks = Array.from(subscribers);
-
-		const emitOrigin = key === origin ? undefined : origin;
-
-		const newValue = getValue(proxy, key) as unknown;
-		const oldValue = (values[keys.indexOf(key)] ?? undefined) as unknown;
-
-		for (const callback of callbacks) {
-			callback(newValue, oldValue, emitOrigin);
-		}
-	}
-}
-
 function handleArray(parameters: ArrayParameters): unknown {
 	const {array, callback, state, prefix} = parameters;
 
-	function synthetic(...args: any[]) {
+	function synthetic(...args: unknown[]): unknown {
 		const oldArray = array.slice(0);
 
 		const result = Array.prototype[callback as never].apply(
@@ -162,8 +95,8 @@ function handleArray(parameters: ArrayParameters): unknown {
 			args,
 		) as unknown;
 
-		const properties = [];
-		const values = [];
+		const properties: number[] = [];
+		const values: unknown[] = [];
 
 		for (const item of oldArray) {
 			const index = oldArray.indexOf(item);
@@ -195,12 +128,12 @@ function handleArray(parameters: ArrayParameters): unknown {
 		case 'fill':
 		case 'push':
 		case 'unshift': {
-			return (...items: any[]) =>
+			return (...items: unknown[]) =>
 				synthetic(...(transformData(state, prefix, items, true) as unknown[]));
 		}
 
 		case 'splice': {
-			return (start: number, remove: number, ...items: any[]) =>
+			return (start: number, remove: number, ...items: unknown[]) =>
 				synthetic(
 					start,
 					remove,
@@ -214,8 +147,45 @@ function handleArray(parameters: ArrayParameters): unknown {
 	}
 }
 
-function isStore(value: any): boolean {
-	return (value as Record<string, any>)?.[stateKey] instanceof State;
+function isStore(value: unknown): boolean {
+	return (value as Record<string, unknown>)?.[stateKey] instanceof State;
+}
+
+function setValue(parameters: ValueParameters): boolean {
+	const {newValue, oldValue, prefix, property, state} = parameters;
+
+	let properties: string[] | undefined;
+	let values: unknown[] | undefined;
+
+	if (isStore(oldValue)) {
+		properties = [];
+		values = [];
+
+		const oldKeys = Object.keys(oldValue as Store<Data>);
+		const newKeys = Object.keys(newValue as Store<Data>);
+
+		for (const key of oldKeys) {
+			if ((oldValue as Store<Data>)[key] !== (newValue as Store<Data>)[key]) {
+				properties.push(key);
+				values.push((oldValue as Store<Data>)[key]);
+			}
+		}
+
+		for (const key of newKeys) {
+			if (!(key in (oldValue as Store<Data>))) {
+				properties.push(key);
+			}
+		}
+	}
+
+	emit(
+		state,
+		properties === undefined ? prefix : getKey(prefix, property),
+		properties ?? [property],
+		values ?? [oldValue],
+	);
+
+	return true;
 }
 
 /**

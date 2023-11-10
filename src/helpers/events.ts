@@ -47,11 +47,7 @@ export function getEventParameters(attribute: string): EventParameters {
 }
 
 export function removeEvents(element: Node): void {
-	const stored = nodeProperties.get(element);
-
-	if (stored === undefined) {
-		return;
-	}
+	const stored = nodeProperties.get(element) ?? new Map<never, never>();
 
 	for (const [name, events] of stored) {
 		for (const event of events) {

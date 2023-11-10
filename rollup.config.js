@@ -5,8 +5,8 @@ const format = process?.env?.ROLLUP_FORMAT ?? 'es';
 const isEsm = format === 'es';
 
 const banner = isEsm
-	? `/** @typedef {{[index: number]: any; [key: string]: any}} Data */
-/** @typedef {{[K in keyof T]: T[K] extends Data ? Store<T[K]> : T[K]} & Data} Store<T> @template T */`
+	? `/** @typedef {{[index: number]: unknown; [key: string]: unknown}} Data */
+/** @typedef {{[Key in keyof Value]: Value[Key] extends unknown[] ? Value[Key] : Value[Key] extends Data ? Store<Value[Key]> : Value[Key]}} Store<Value> @template Value */`
 	: undefined;
 
 const file = isEsm ? './dist/blixt.js' : './dist/blixt.iife.js';

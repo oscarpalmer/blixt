@@ -5,7 +5,7 @@ import {StoreSubscription} from '../store/subscription';
 
 type ObservableSubscriptionState = {
 	active: boolean;
-	after: (value: any) => any;
+	after: (value: unknown) => unknown;
 	subscriptions: Set<StoreSubscription>;
 };
 
@@ -28,7 +28,7 @@ export class Observable {
 
 	constructor(private readonly callback: () => any) {}
 
-	subscribe(callback: (value: any) => any): ObservableSubscription {
+	subscribe(callback: (value: unknown) => unknown): ObservableSubscription {
 		const subscription = new ObservableSubscription(this, callback);
 
 		this.subscriptions.add(subscription);
@@ -104,7 +104,7 @@ export class Observable {
  * A subscription to an observed function, which can be unsubscribed and resubscribed as needed.
  */
 export class ObservableSubscription {
-	constructor(observable: Observable, after: (value: any) => any) {
+	constructor(observable: Observable, after: (value: unknown) => unknown) {
 		parents.set(this, observable);
 
 		states.set(this, {
@@ -119,11 +119,14 @@ export class ObservableSubscription {
 	}
 
 	unsubscribe(): void {
-		manage('remove', this);
+		manage('delete', this);
 	}
 }
 
-function manage(type: 'add' | 'remove', subscription: ObservableSubscription) {
+function manage(
+	type: 'add' | 'delete',
+	subscription: ObservableSubscription,
+): void {
 	const add = type === 'add';
 
 	const parent = parents.get(subscription);
@@ -139,7 +142,7 @@ function manage(type: 'add' | 'remove', subscription: ObservableSubscription) {
 		storeSubscription[add ? 'resubscribe' : 'unsubscribe']();
 	}
 
-	parent.subscriptions[add ? 'add' : 'delete'](subscription);
+	parent.subscriptions[type](subscription);
 
 	if (add) {
 		parent.run();
@@ -150,12 +153,12 @@ function manage(type: 'add' | 'remove', subscription: ObservableSubscription) {
  * - Observes changes for properties used in a function
  * - Returns a subscription that can be unsubscribed and resubscribed as needed
  * @param {() => any} callback
- * @param {{(value: any) => any}=} after
+ * @param {{(value: unknown) => unknown}=} after
  * @returns {ObservableSubscription}
  */
 export function observe(
-	callback: () => any,
-	after: (value: any) => any,
+	callback: () => unknown,
+	after: (value: unknown) => unknown,
 ): ObservableSubscription {
 	if (typeof callback !== 'function') {
 		throw new TypeError('Callback must be a function');
