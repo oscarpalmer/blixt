@@ -14,7 +14,7 @@ export const comment = '<!--blixt-->';
 
 export const documentFragmentConstructor = /^documentfragment$/i;
 
-export const nodeItems: ObservedItem[][] = [];
+export const nodeItems = new Map<string, ObservedItem[]>();
 
 export const nodeProperties = new WeakMap<
 	Node,
@@ -28,7 +28,7 @@ export const nodeSubscriptions = new WeakMap<
 
 export const proxies = new WeakMap<State, ProxyConstructor>();
 
-export const stateKey = '__state';
+export const stateKey = '__state__';
 
 export const storeSubscriptions = new WeakMap<
 	State,

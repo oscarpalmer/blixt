@@ -17,7 +17,7 @@ export class Template {
 
 	/**
 	 * Gets the template's ID
-	 * @returns {(number|string|symbol)=}
+	 * @returns {(number|string|symbol)=} The template's ID (undefined if not set)
 	 */
 	get id(): Key | undefined {
 		return this.identifier;
@@ -43,9 +43,9 @@ export class Template {
 	 * - Hydrates an existing node using the template and all its expressions
 	 * - If a callback is provided, it will be called after the node has been successfully hydrated
 	 *
-	 * @param {Node} node
-	 * @param {((node: Node) => void)=} callback
-	 * @returns {Node}
+	 * @param {Node} node Node to hydrate
+	 * @param {((node: Node) => void)=} callback Callback to call after hydration
+	 * @returns {Node} Hydrated node
 	 */
 	hydrate(node: Node, callback: ((node: Node) => void) | undefined): Node {
 		return hydrate(node, this, callback);
@@ -53,8 +53,8 @@ export class Template {
 
 	/**
 	 * Sets the template's ID to uniquely identify it in a list of templates
-	 * @param {number|string|symbol} key
-	 * @returns {Template}
+	 * @param {number|string|symbol} key Template ID
+	 * @returns {Template} The template
 	 */
 	identify(key: Key): this {
 		if (this.identifier === undefined && isKey(key)) {
@@ -66,8 +66,8 @@ export class Template {
 
 	/**
 	 * Renders a template, on its own or for a parent
-	 * @param {ParentNode=} parent
-	 * @returns {Node}
+	 * @param {ParentNode=} parent Optional parent node to append the template to
+	 * @returns {Node} Rendered template node (or the parent node if provided)
 	 */
 	render(parent?: ParentNode): Node {
 		const rendered = render(this);

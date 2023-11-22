@@ -1,4 +1,4 @@
-import type {Data, Key, Store, Subscriber} from '../models';
+import type {Data, Key, Subscriber} from '../models';
 import {State} from '../models';
 import {stateKey, storeSubscriptions} from '../data';
 import {getString, isKey} from '../helpers';
@@ -83,14 +83,13 @@ function manage(type: 'add' | 'remove', subscription: StoreSubscription): void {
 /**
  * - Subscribes to value changes for a key in a store
  * - Returns a subscription that can be unsubscribed and resubscribed as needed
- * @template {Data} T
- * @param {Store<T>} store
- * @param {number|string|symbol} key
- * @param {(newValue: unknown, oldValue?: unknown, origin?: string) => void} callback
- * @returns {StoreSubscription}
+ * @param {Data} store Reactive store
+ * @param {number|string|symbol} key Key to subscribe to
+ * @param {(newValue: unknown, oldValue?: unknown, origin?: string) => void} callback Callback to call when the value changes
+ * @returns {StoreSubscription} Subscription to the value
  */
-export function subscribe<T extends Data>(
-	store: Store<T>,
+export function subscribe(
+	store: Data,
 	key: Key,
 	callback: Subscriber,
 ): StoreSubscription {

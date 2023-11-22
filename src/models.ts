@@ -1,6 +1,6 @@
 import type {Expression, Template} from './template';
 
-export type Data = {[index: number]: any; [key: string]: any};
+export type Data = Record<number | string, unknown>;
 
 export type EventExpression = {
 	expression: Expression;
@@ -20,14 +20,6 @@ export type ObservedItem = {
 };
 
 export class State {}
-
-export type Store<T extends Data> = {
-	[K in keyof T]: T[K] extends unknown[]
-		? T[K]
-		: T[K] extends Data
-		? Store<T[K]> & Data
-		: T[K];
-};
 
 export type Subscriber = (
 	newValue: unknown,

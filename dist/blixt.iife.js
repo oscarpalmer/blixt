@@ -4,14 +4,15 @@ var Blixt = (function (exports) {
     const blixt = 'blixt';
     const comment = '<!--blixt-->';
     const documentFragmentConstructor = /^documentfragment$/i;
-    const nodeItems = [];
+    const nodeItems = new Map();
     const nodeProperties = new WeakMap();
     const nodeSubscriptions = new WeakMap();
     const proxies = new WeakMap();
-    const stateKey = '__state';
+    const stateKey = '__state__';
     const storeSubscriptions = new WeakMap();
     const templateData = new WeakMap();
 
+    const idTemplate = '10000000-1000-4000-8000-100000000000';
     const keyTypes = new Set(['number', 'string', 'symbol']);
     function compareArrayOrder(first, second) {
         const target = first.length > second.length ? second : first;
@@ -31,6 +32,10 @@ var Blixt = (function (exports) {
     }
     function getString(value) {
         return typeof value === 'string' ? value : String(value);
+    }
+    function getUniqueId() {
+        return idTemplate.replaceAll(/[018]/g, (substring) => (substring ^
+            (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (substring / 4)))).toString(16));
     }
     function getValue(data, key) {
         if (typeof data !== 'object') {
@@ -136,11 +141,10 @@ var Blixt = (function (exports) {
     /**
      * - Subscribes to value changes for a key in a store
      * - Returns a subscription that can be unsubscribed and resubscribed as needed
-     * @template {Data} T
-     * @param {Store<T>} store
-     * @param {number|string|symbol} key
-     * @param {(newValue: unknown, oldValue?: unknown, origin?: string) => void} callback
-     * @returns {StoreSubscription}
+     * @param {Data} store Reactive store
+     * @param {number|string|symbol} key Key to subscribe to
+     * @param {(newValue: unknown, oldValue?: unknown, origin?: string) => void} callback Callback to call when the value changes
+     * @returns {StoreSubscription} Subscription to the value
      */
     function subscribe(store, key, callback) {
         return new StoreSubscription(store?.[stateKey], key, callback);
@@ -239,9 +243,9 @@ var Blixt = (function (exports) {
     /**
      * - Observes changes for properties used in a function
      * - Returns a subscription that can be unsubscribed and resubscribed as needed
-     * @param {() => any} callback
-     * @param {{(value: unknown) => unknown}=} after
-     * @returns {ObservableSubscription}
+     * @param {() => any} callback Function to observe
+     * @param {{(value: unknown) => unknown}=} after Callback to call after the function is called
+     * @returns {ObservableSubscription} Subscription to the observation
      */
     function observe(callback, after) {
         if (typeof callback !== 'function') {
@@ -418,9 +422,9 @@ var Blixt = (function (exports) {
     }
     /**
      * Creates a reactive store
-     * @template {Data} T
-     * @param {T} data
-     * @returns {Store<T>}
+     * @template {Record<number | string, unknown>} T
+     * @param {T} data Original data object
+     * @returns {T} Reactive store
      */
     function store(data) {
         if (typeof data !== 'object') {
@@ -459,14 +463,14 @@ var Blixt = (function (exports) {
     }
 
     function observeContent(comment, expression) {
-        let index;
+        let id;
         let isText = false;
         observe(expression.value, value => {
-            const items = index === undefined ? undefined : nodeItems[index];
+            const items = id === undefined ? undefined : nodeItems.get(id);
             const isArray = Array.isArray(value);
             if (value === undefined || value === null || isArray) {
                 isText = false;
-                index = setContent(index, isArray && value.length > 0
+                id = setNodeItems(id, isArray && value.length > 0
                     ? updateArray(comment, items, value)
                     : items === undefined
                         ? undefined
@@ -481,21 +485,31 @@ var Blixt = (function (exports) {
                 return;
             }
             isText = node instanceof Text;
-            index = setContent(index, replaceNodes(items ?? [{ nodes: [comment] }], getObservedItems(node), true));
+            id = setNodeItems(id, replaceNodes(items ?? [{ nodes: [comment] }], getObservedItems(node), true));
         });
     }
-    function setContent(index, items) {
+    function removeNodeItems(node) {
+        for (const [id, items] of nodeItems) {
+            for (const item of items) {
+                if (item.nodes.includes(node)) {
+                    item.nodes.splice(item.nodes.indexOf(node), 1);
+                }
+            }
+            if (items.flatMap(item => item.nodes).length === 0) {
+                nodeItems.delete(id);
+            }
+        }
+    }
+    function setNodeItems(id, items) {
         if (items === undefined) {
-            if (index !== undefined) {
-                nodeItems.splice(index, 1);
+            if (id !== undefined) {
+                nodeItems.delete(id);
             }
             return undefined;
         }
-        if (index === undefined) {
-            return nodeItems.push(items) - 1;
-        }
-        nodeItems.splice(index, 1, items);
-        return index;
+        id ?? (id = getUniqueId());
+        nodeItems.set(id, items);
+        return id;
     }
     function updateArray(comment, current, array) {
         let templated = array.filter(item => item instanceof Template && item.id !== undefined);
@@ -710,20 +724,24 @@ var Blixt = (function (exports) {
         }
     }
 
+    function cleanNode(node, removeSubscriptions) {
+        removeEvents(node);
+        removeNodeItems(node);
+        nodeProperties.delete(node);
+        if (removeSubscriptions) {
+            const subscriptions = nodeSubscriptions.get(node) ?? [];
+            for (const subscription of subscriptions) {
+                subscription.unsubscribe();
+            }
+            nodeSubscriptions.delete(node);
+        }
+        if (node.hasChildNodes()) {
+            cleanNodes(Array.from(node.childNodes), removeSubscriptions);
+        }
+    }
     function cleanNodes(nodes, removeSubscriptions) {
         for (const node of nodes) {
-            removeEvents(node);
-            nodeProperties.delete(node);
-            if (removeSubscriptions) {
-                const subscriptions = nodeSubscriptions.get(node) ?? [];
-                for (const subscription of subscriptions) {
-                    subscription.unsubscribe();
-                }
-                nodeSubscriptions.delete(node);
-            }
-            if (node.hasChildNodes()) {
-                cleanNodes(Array.from(node.childNodes), removeSubscriptions);
-            }
+            cleanNode(node, removeSubscriptions);
         }
     }
     function createNode(value) {
@@ -832,7 +850,7 @@ var Blixt = (function (exports) {
         return node;
     }
     function hydrateContent(pair) {
-        const item = nodeItems
+        const item = [...nodeItems.values()]
             .find(items => items.some(item => item.nodes.includes(pair.second)))
             ?.find(item => item.nodes.includes(pair.second));
         if (item === undefined) {
@@ -884,7 +902,7 @@ var Blixt = (function (exports) {
     class Template {
         /**
          * Gets the template's ID
-         * @returns {(number|string|symbol)=}
+         * @returns {(number|string|symbol)=} The template's ID (undefined if not set)
          */
         get id() {
             return this.identifier;
@@ -908,17 +926,17 @@ var Blixt = (function (exports) {
          * - Hydrates an existing node using the template and all its expressions
          * - If a callback is provided, it will be called after the node has been successfully hydrated
          *
-         * @param {Node} node
-         * @param {((node: Node) => void)=} callback
-         * @returns {Node}
+         * @param {Node} node Node to hydrate
+         * @param {((node: Node) => void)=} callback Callback to call after hydration
+         * @returns {Node} Hydrated node
          */
         hydrate(node, callback) {
             return hydrate(node, this, callback);
         }
         /**
          * Sets the template's ID to uniquely identify it in a list of templates
-         * @param {number|string|symbol} key
-         * @returns {Template}
+         * @param {number|string|symbol} key Template ID
+         * @returns {Template} The template
          */
         identify(key) {
             if (this.identifier === undefined && isKey(key)) {
@@ -928,8 +946,8 @@ var Blixt = (function (exports) {
         }
         /**
          * Renders a template, on its own or for a parent
-         * @param {ParentNode=} parent
-         * @returns {Node}
+         * @param {ParentNode=} parent Optional parent node to append the template to
+         * @returns {Node} Rendered template node (or the parent node if provided)
          */
         render(parent) {
             const rendered = render(this);

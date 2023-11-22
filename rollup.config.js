@@ -4,11 +4,6 @@ import typescript from '@rollup/plugin-typescript';
 const format = process?.env?.ROLLUP_FORMAT ?? 'es';
 const isEsm = format === 'es';
 
-const banner = isEsm
-	? `/** @typedef {{[index: number]: unknown; [key: string]: unknown}} Data */
-/** @typedef {{[Key in keyof Value]: Value[Key] extends unknown[] ? Value[Key] : Value[Key] extends Data ? Store<Value[Key]> : Value[Key]}} Store<Value> @template Value */`
-	: undefined;
-
 const file = isEsm ? './dist/blixt.js' : './dist/blixt.iife.js';
 
 const name = 'Blixt';
@@ -16,7 +11,6 @@ const name = 'Blixt';
 const configuration = {
 	input: './src/index.ts',
 	output: {
-		banner,
 		file,
 		format,
 		name,

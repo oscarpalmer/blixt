@@ -1,4 +1,4 @@
-import type {Data, Key, State, Store} from '../models';
+import type {Data, Key, State} from '../models';
 import {proxies, stateKey} from '../data';
 import {getString} from '../helpers';
 import {StoreSubscription} from '../store/subscription';
@@ -10,7 +10,7 @@ type ObservableSubscriptionState = {
 };
 
 const observables = new WeakMap<() => any, Observable>();
-const observers = new Map<symbol, Map<Store<Data>, Set<string>>>();
+const observers = new Map<symbol, Map<Data, Set<string>>>();
 const parents = new WeakMap<ObservableSubscription, Observable>();
 
 const states = new WeakMap<
@@ -23,7 +23,7 @@ export class Observable {
 
 	private frame: number | undefined;
 	private readonly id = Symbol(undefined);
-	private observed = new Map<Store<Data>, Set<Key>>();
+	private observed = new Map<Data, Set<Key>>();
 	private readonly onQueue = this.queue.bind(this);
 
 	constructor(private readonly callback: () => any) {}
@@ -41,7 +41,7 @@ export class Observable {
 
 		const value = this.callback() as unknown;
 
-		const observed = observers.get(this.id) ?? new Map<Store<Data>, Set<Key>>();
+		const observed = observers.get(this.id) ?? new Map<Data, Set<Key>>();
 
 		for (const subscription of this.subscriptions) {
 			const state = states.get(subscription)!;
@@ -152,9 +152,9 @@ function manage(
 /**
  * - Observes changes for properties used in a function
  * - Returns a subscription that can be unsubscribed and resubscribed as needed
- * @param {() => any} callback
- * @param {{(value: unknown) => unknown}=} after
- * @returns {ObservableSubscription}
+ * @param {() => any} callback Function to observe
+ * @param {{(value: unknown) => unknown}=} after Callback to call after the function is called
+ * @returns {ObservableSubscription} Subscription to the observation
  */
 export function observe(
 	callback: () => unknown,

@@ -83,7 +83,7 @@ export function hydrate(
 }
 
 function hydrateContent(pair: NodePair): void {
-	const item = nodeItems
+	const item = [...nodeItems.values()]
 		.find(items =>
 			items.some(item => item.nodes.includes(pair.second as never)),
 		)

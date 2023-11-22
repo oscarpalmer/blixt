@@ -1,6 +1,6 @@
 import type {ObservedItem} from '../models';
 import {nodeItems} from '../data';
-import {compareArrayOrder} from '../helpers';
+import {compareArrayOrder, getUniqueId} from '../helpers';
 import {getObservedItem, getObservedItems} from '../helpers/dom';
 import {cleanNodes, createNode, replaceNodes} from '../helpers/dom/node';
 import type {Expression} from '../template';
@@ -8,23 +8,23 @@ import {Template} from '../template';
 import {observe} from './index';
 
 export function observeContent(comment: Comment, expression: Expression): void {
-	let index: number | undefined;
+	let id: string | undefined;
 	let isText = false;
 
 	observe(expression.value, value => {
-		const items = index === undefined ? undefined : nodeItems[index];
+		const items = id === undefined ? undefined : nodeItems.get(id);
 		const isArray = Array.isArray(value);
 
 		if (value === undefined || value === null || isArray) {
 			isText = false;
 
-			index = setContent(
-				index,
+			id = setNodeItems(
+				id,
 				isArray && value.length > 0
 					? updateArray(comment, items, value)
 					: items === undefined
-					? undefined
-					: replaceNodes(items, [{nodes: [comment]}], false),
+					  ? undefined
+					  : replaceNodes(items, [{nodes: [comment]}], false),
 			);
 
 			return;
@@ -42,32 +42,44 @@ export function observeContent(comment: Comment, expression: Expression): void {
 
 		isText = node instanceof Text;
 
-		index = setContent(
-			index,
+		id = setNodeItems(
+			id,
 			replaceNodes(items ?? [{nodes: [comment]}], getObservedItems(node), true),
 		);
 	});
 }
 
-function setContent(
-	index: number | undefined,
+export function removeNodeItems(node: Node): void {
+	for (const [id, items] of nodeItems) {
+		for (const item of items) {
+			if (item.nodes.includes(node as never)) {
+				item.nodes.splice(item.nodes.indexOf(node as never), 1);
+			}
+		}
+
+		if (items.flatMap(item => item.nodes).length === 0) {
+			nodeItems.delete(id);
+		}
+	}
+}
+
+function setNodeItems(
+	id: string | undefined,
 	items: ObservedItem[] | undefined,
-): number | undefined {
+): string | undefined {
 	if (items === undefined) {
-		if (index !== undefined) {
-			nodeItems.splice(index, 1);
+		if (id !== undefined) {
+			nodeItems.delete(id);
 		}
 
 		return undefined;
 	}
 
-	if (index === undefined) {
-		return nodeItems.push(items) - 1;
-	}
+	id ??= getUniqueId();
 
-	nodeItems.splice(index, 1, items);
+	nodeItems.set(id, items);
 
-	return index;
+	return id;
 }
 
 export function updateArray(

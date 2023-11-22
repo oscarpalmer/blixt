@@ -6,34 +6,40 @@ import type {
 import {
 	blixt,
 	documentFragmentConstructor,
+	nodeItems,
 	nodeProperties,
 	nodeSubscriptions,
 } from '../../data';
-import {observeContent} from '../../observer/content';
+import {observeContent, removeNodeItems} from '../../observer/content';
 import {Expression, Template} from '../../template';
 import {getString} from '../index';
 import {removeEvents} from '../events';
 import {mapAttributes} from './attribute';
 
+function cleanNode(node: Node, removeSubscriptions: boolean): void {
+	removeEvents(node);
+	removeNodeItems(node);
+
+	nodeProperties.delete(node);
+
+	if (removeSubscriptions) {
+		const subscriptions = nodeSubscriptions.get(node) ?? [];
+
+		for (const subscription of subscriptions) {
+			subscription.unsubscribe();
+		}
+
+		nodeSubscriptions.delete(node);
+	}
+
+	if (node.hasChildNodes()) {
+		cleanNodes(Array.from(node.childNodes), removeSubscriptions);
+	}
+}
+
 export function cleanNodes(nodes: Node[], removeSubscriptions: boolean): void {
 	for (const node of nodes) {
-		removeEvents(node);
-
-		nodeProperties.delete(node);
-
-		if (removeSubscriptions) {
-			const subscriptions = nodeSubscriptions.get(node) ?? [];
-
-			for (const subscription of subscriptions) {
-				subscription.unsubscribe();
-			}
-
-			nodeSubscriptions.delete(node);
-		}
-
-		if (node.hasChildNodes()) {
-			cleanNodes(Array.from(node.childNodes), removeSubscriptions);
-		}
+		cleanNode(node, removeSubscriptions);
 	}
 }
 

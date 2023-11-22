@@ -1,9 +1,11 @@
-import type {Data, Key, Store} from '../models';
+import type {Data, Key, Subscriber} from '../models';
 import {State} from '../models';
 import {proxies, stateKey, storeSubscriptions} from '../data';
 import {getKey, getString, isGenericObject} from '../helpers';
 import {observeKey} from '../observer';
 import {emit} from './emit';
+import type {StoreSubscription} from './subscription';
+import {subscribe} from './subscription';
 
 type ArrayParameters = {
 	array: unknown[];
@@ -21,11 +23,7 @@ type ValueParameters = {
 	state: State;
 };
 
-export function createStore<T extends Data>(
-	data: T,
-	state?: State,
-	prefix?: string,
-): Store<T> {
+export function createStore(data: Data, state?: State, prefix?: string): Data {
 	if (isStore(data) || !isGenericObject(data)) {
 		return data;
 	}
@@ -81,7 +79,7 @@ export function createStore<T extends Data>(
 		storeSubscriptions.set(proxyState, new Map());
 	}
 
-	return proxy as Store<T>;
+	return proxy as Data;
 }
 
 function handleArray(parameters: ArrayParameters): unknown {
@@ -161,18 +159,18 @@ function setValue(parameters: ValueParameters): boolean {
 		properties = [];
 		values = [];
 
-		const oldKeys = Object.keys(oldValue as Store<Data>);
-		const newKeys = Object.keys(newValue as Store<Data>);
+		const oldKeys = Object.keys(oldValue as Data);
+		const newKeys = Object.keys(newValue as Data);
 
 		for (const key of oldKeys) {
-			if ((oldValue as Store<Data>)[key] !== (newValue as Store<Data>)[key]) {
+			if ((oldValue as Data)[key] !== (newValue as Data)[key]) {
 				properties.push(key);
-				values.push((oldValue as Store<Data>)[key]);
+				values.push((oldValue as Data)[key]);
 			}
 		}
 
 		for (const key of newKeys) {
-			if (!(key in (oldValue as Store<Data>))) {
+			if (!(key in (oldValue as Data))) {
 				properties.push(key);
 			}
 		}
@@ -190,16 +188,16 @@ function setValue(parameters: ValueParameters): boolean {
 
 /**
  * Creates a reactive store
- * @template {Data} T
- * @param {T} data
- * @returns {Store<T>}
+ * @template {Record<number | string, unknown>} T
+ * @param {T} data Original data object
+ * @returns {T} Reactive store
  */
-export function store<T extends Data>(data: T): Store<T> {
+export function store<T extends Data>(data: T): T {
 	if (typeof data !== 'object') {
 		throw new TypeError('Data must be an object');
 	}
 
-	return createStore(data);
+	return createStore(data) as T;
 }
 
 function transformData(
