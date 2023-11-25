@@ -1,6 +1,7 @@
+import {getValue} from '@oscarpalmer/atoms';
 import {proxies, storeSubscriptions} from '../data';
 import type {Key, State} from '../models';
-import {getKey, getValue} from '../helpers';
+import {getKey} from '../helpers';
 
 type Parameters = {
 	key: string;
@@ -52,7 +53,7 @@ function emitValue(parameters: Parameters): void {
 
 	const emitOrigin = key === origin ? undefined : origin;
 
-	const newValue = getValue(proxy, key) as unknown;
+	const newValue = getValue(proxy, key);
 	const oldValue = (values[keys.indexOf(key)] ?? undefined) as unknown;
 
 	for (const callback of callbacks) {

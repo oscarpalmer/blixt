@@ -1,11 +1,10 @@
-import type {Data, Key, Subscriber} from '../models';
+import {getString} from '@oscarpalmer/atoms';
+import type {Data, Key} from '../models';
 import {State} from '../models';
 import {proxies, stateKey, storeSubscriptions} from '../data';
-import {getKey, getString, isGenericObject} from '../helpers';
+import {getKey, isGenericObject} from '../helpers';
 import {observeKey} from '../observer';
 import {emit} from './emit';
-import type {StoreSubscription} from './subscription';
-import {subscribe} from './subscription';
 
 type ArrayParameters = {
 	array: unknown[];

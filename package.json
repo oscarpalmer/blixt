@@ -6,6 +6,8 @@
 	"description": "⚡️",
 	"devDependencies": {
 		"@happy-dom/global-registrator": "^12.10",
+		"@oscarpalmer/atoms": "^0.5",
+		"@rollup/plugin-node-resolve": "^15.2",
 		"@rollup/plugin-typescript": "^11.1",
 		"bun": "^1.0",
 		"prettier": "^3.1",
@@ -48,18 +50,16 @@
 		"url": "git+https://github.com/oscarpalmer/blixt.git"
 	},
 	"scripts": {
-		"build": "npm run build:esm && npm run build:iife",
-		"build:esm": "rollup -c",
-		"build:iife": "rollup -c --environment ROLLUP_FORMAT:iife",
-		"test": "bun test --coverage --preload ./test/preload.ts",
-		"types": "tsc ./src/index.ts --declaration --declarationDir ./types --emitDeclarationOnly",
-		"watch": "rollup -c -w",
-		"xo": "xo ./src/*.ts ./src/**/*.ts --env browser"
+		"build": "npx bun build ./src/index.ts --outfile ./dist/blixt.js",
+		"test": "npx bun test --coverage --preload ./test/preload.ts",
+		"types": "npx tsc ./src/index.ts --declaration --declarationDir ./types --emitDeclarationOnly",
+		"watch": "npx bun build ./src/index.ts --outfile ./dist/blixt.js --watch",
+		"xo": "npx xo ./src/*.ts ./src/**/*.ts --env browser"
 	},
 	"type": "module",
 	"types": "src/index.d.ts",
 	"unpkg": "dist/blixt.iife.js",
-	"version": "0.32.0",
+	"version": "0.33.0",
 	"xo": {
 		"envs": [
 			"browser"

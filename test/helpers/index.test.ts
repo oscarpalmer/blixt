@@ -8,13 +8,6 @@ test('getKey', () => {
 	expect(getKey('test', undefined)).toEqual('test');
 });
 
-test('getValue', () => {
-	expect(getValue(1, 'a')).toEqual(1);
-	expect(getValue({a: 1}, 'a')).toEqual(1);
-	expect(getValue({a: {b: 2}}, 'a.b')).toEqual(2);
-	expect(getValue({a: {b: 2}}, 'a.b.c')).toEqual(undefined);
-});
-
 test('isGenericObject', () => {
 	expect(isGenericObject({})).toEqual(true);
 	expect(isGenericObject([])).toEqual(true);

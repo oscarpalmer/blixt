@@ -1,9 +1,8 @@
+import {getString} from '@oscarpalmer/atoms';
 import {nodeProperties, nodeSubscriptions} from '../data';
 import type {EventExpression, Key} from '../models';
 import type {ObservableSubscription} from '../observer';
 import type {Expression} from '../template';
-
-const idTemplate = '10000000-1000-4000-8000-100000000000';
 
 const keyTypes = new Set<string>(['number', 'string', 'symbol']);
 
@@ -30,35 +29,6 @@ export function getKey(...parts: Array<Key | undefined>): string {
 		.map(part => getString(part).trim())
 		.filter(part => part.length > 0)
 		.join('.');
-}
-
-export function getString(value: unknown): string {
-	return typeof value === 'string' ? value : String(value);
-}
-
-export function getUniqueId(): string {
-	return idTemplate.replaceAll(/[018]/g, (substring: any) =>
-		(
-			substring ^
-			(crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (substring / 4)))
-		).toString(16),
-	);
-}
-
-export function getValue(data: unknown, key: string): unknown {
-	if (typeof data !== 'object') {
-		return data;
-	}
-
-	const parts = key.split('.');
-
-	let value: unknown = data;
-
-	for (const part of parts) {
-		value = (value as Record<string, unknown>)?.[part];
-	}
-
-	return value;
 }
 
 export function isGenericObject(value: unknown): boolean {

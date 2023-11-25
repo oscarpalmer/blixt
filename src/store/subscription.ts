@@ -1,7 +1,8 @@
+import {getString} from '@oscarpalmer/atoms';
 import type {Data, Key, Subscriber} from '../models';
 import {State} from '../models';
 import {stateKey, storeSubscriptions} from '../data';
-import {getString, isKey} from '../helpers';
+import {isKey} from '../helpers';
 
 type SubscriptionState = {
 	callback: Subscriber;

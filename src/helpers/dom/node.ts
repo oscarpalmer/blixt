@@ -1,3 +1,4 @@
+import {getString} from '@oscarpalmer/atoms';
 import type {
 	ObservedItem,
 	TemplateData,
@@ -6,13 +7,11 @@ import type {
 import {
 	blixt,
 	documentFragmentConstructor,
-	nodeItems,
 	nodeProperties,
 	nodeSubscriptions,
 } from '../../data';
 import {observeContent, removeNodeItems} from '../../observer/content';
 import {Expression, Template} from '../../template';
-import {getString} from '../index';
 import {removeEvents} from '../events';
 import {mapAttributes} from './attribute';
 

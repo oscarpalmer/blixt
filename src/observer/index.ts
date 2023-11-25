@@ -1,6 +1,6 @@
+import {getString} from '@oscarpalmer/atoms';
 import type {Data, Key, State} from '../models';
 import {proxies, stateKey} from '../data';
-import {getString} from '../helpers';
 import {StoreSubscription} from '../store/subscription';
 
 type ObservableSubscriptionState = {

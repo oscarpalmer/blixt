@@ -1,6 +1,7 @@
+import {getString} from '@oscarpalmer/atoms';
 import type {Key} from '../models';
 import {comment, templateData} from '../data';
-import {getString, isKey} from '../helpers';
+import {isKey} from '../helpers';
 import {createNodes, mapNodes} from '../helpers/dom/node';
 import {hydrate} from './hydration';
 

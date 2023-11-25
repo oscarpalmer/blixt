@@ -1,6 +1,7 @@
+import {createUuid} from '@oscarpalmer/atoms';
 import type {ObservedItem} from '../models';
 import {nodeItems} from '../data';
-import {compareArrayOrder, getUniqueId} from '../helpers';
+import {compareArrayOrder} from '../helpers';
 import {getObservedItem, getObservedItems} from '../helpers/dom';
 import {cleanNodes, createNode, replaceNodes} from '../helpers/dom/node';
 import type {Expression} from '../template';
@@ -75,7 +76,7 @@ function setNodeItems(
 		return undefined;
 	}
 
-	id ??= getUniqueId();
+	id ??= createUuid();
 
 	nodeItems.set(id, items);
 
